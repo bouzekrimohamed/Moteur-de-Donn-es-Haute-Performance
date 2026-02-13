@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="7ca90be4-d187-4bb1-8d69-8283add749d9" name="Changes" comment="Création de la structure de données">
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Moteur-de-Donn-es-Haute-Performance.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/.classpath" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/.project" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/.settings/org.eclipse.core.resources.prefs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/.settings/org.eclipse.jdt.core.prefs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/bin/data/Colonne.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/bin/data/Ligne.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/bin/data/Table.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/bin/module-info.class" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/src/data/Colonne.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/src/data/Table.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Data/src/module-info.java" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="UPDATE_TYPE" value="REBASE" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;AbelFEL&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/bouzekrimohamed/Moteur-de-Donn-es-Haute-Performance.git&quot;,
+    &quot;accountId&quot;: &quot;93827b2a-6fb0-48be-9c75-1292a0292b44&quot;
+  }
+}</component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="mavenHomeTypeForPersistence" value="WRAPPER" />
+      </MavenGeneralSettings>
+    </option>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="39cUDKQKomjHW02HMrMv8DvHkT8" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\code-with-quarkus\src\main\java\data" />
+    </key>
+  </component>
+  <component name="RunDashboard">
+    <option name="configurationTypes">
+      <set>
+        <option value="ShConfigurationType" />
+      </set>
+    </option>
+  </component>
+  <component name="RunManager">
+    <configuration name="Unnamed" type="ShConfigurationType" nameIsGenerated="true">
+      <option name="SCRIPT_TEXT" value="" />
+      <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+      <option name="SCRIPT_PATH" value="" />
+      <option name="SCRIPT_OPTIONS" value="" />
+      <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+      <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+      <option name="INTERPRETER_PATH" value="powershell.exe" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="EXECUTE_IN_TERMINAL" value="true" />
+      <option name="EXECUTE_SCRIPT_FILE" value="true" />
+      <envs />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.30387.90" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.30387.90" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="7ca90be4-d187-4bb1-8d69-8283add749d9" name="Changes" comment="" />
+      <created>1770994732354</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1770994732354</updated>
+      <workItem from="1770994739031" duration="2198000" />
+      <workItem from="1770997484463" duration="3453000" />
+    </task>
+    <task id="LOCAL-00001" summary="Création de la structure de données">
+      <option name="closed" value="true" />
+      <created>1770994849611</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1770994849611</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Création de la structure de données">
+      <option name="closed" value="true" />
+      <created>1770995456461</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1770995456461</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Création de la structure de données">
+      <option name="closed" value="true" />
+      <created>1770995556629</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1770995556629</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Création de la structure de données" />
+    <option name="LAST_COMMIT_MESSAGE" value="Création de la structure de données" />
+  </component>
+</project>
