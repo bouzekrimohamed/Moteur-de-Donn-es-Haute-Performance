@@ -4,7 +4,26 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7ca90be4-d187-4bb1-8d69-8283add749d9" name="Changes" comment="Création de la structure" />
+    <list default="true" id="7ca90be4-d187-4bb1-8d69-8283add749d9" name="Changes" comment="Création de la structure">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/.dockerignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/.mvn/wrapper/maven-wrapper.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/mvnw" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/mvnw.cmd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/pom.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/docker/Dockerfile.jvm" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/docker/Dockerfile.legacy-jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/docker/Dockerfile.native" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/docker/Dockerfile.native-micro" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/java/data/Column.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/java/data/Table.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/resources/application.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/test/java/org/acme/GreetingResourceIT.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/test/java/org/acme/GreetingResourceTest.java" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -58,7 +77,7 @@
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Structure-java&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
@@ -82,7 +101,45 @@
       </set>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Shell Script.Unnamed">
+    <configuration name="code-with-quarkus" type="QuarkusRunConfigurationType" factoryName="Quarkus" nameIsGenerated="true">
+      <module name="code-with-quarkus" />
+      <QsMavenRunConfiguration>
+        <MavenSettings>
+          <option name="myGeneralSettings" />
+          <option name="myRunnerSettings" />
+          <option name="myRunnerParameters">
+            <MavenRunnerParameters>
+              <option name="cmdOptions" />
+              <option name="profiles">
+                <set />
+              </option>
+              <option name="goals">
+                <list>
+                  <option value="quarkus:dev" />
+                </list>
+              </option>
+              <option name="multimoduleDir" />
+              <option name="pomFileName" value="pom.xml" />
+              <option name="profilesMap">
+                <map />
+              </option>
+              <option name="projectsCmdOptionValues">
+                <list />
+              </option>
+              <option name="resolveToWorkspace" value="false" />
+              <option name="workingDirPath" value="$PROJECT_DIR$/code-with-quarkus" />
+            </MavenRunnerParameters>
+          </option>
+        </MavenSettings>
+        <targetMavenLocalRepo />
+        <emulateTerminal>false</emulateTerminal>
+        <profile>dev</profile>
+      </QsMavenRunConfiguration>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="Unnamed" type="ShConfigurationType" nameIsGenerated="true">
       <option name="SCRIPT_TEXT" value="" />
       <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
