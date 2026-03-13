@@ -5,19 +5,26 @@ import java.util.List;
 
 public class Table {
 	private final String name;
-	private List<Column> columns;
+	private final List<Column> columns;
 
 	public Table (String s, List<Column> l){
 		name=s;
 		columns=l;
 	}
 
+	public boolean addColumn(String name){
+		return columns.add(new Column(name));
+	}
+
 	public boolean setId(String name){
 		for(Column c:columns){
 			if(c.getName().equals(name)){
-				if()
+				c.setId();
+			} else {
+				c.unsetId();
 			}
 		}
+		return true;
 	}
 
 	public void insertRow(List<Object> values){
@@ -52,7 +59,7 @@ public class Table {
 
 	public List<Object> getById (Object id){
 		List<Object> l=new ArrayList<>();
-		int row;
+		int row=-1;
 		for(Column c : columns){
 			if(c.isId()){
 				List<Object> data=c.clone();
@@ -64,6 +71,12 @@ public class Table {
 				}
 				break;
 			}
+		}
+		if (row == -1) {
+			return null;
+		}
+		for(Column c : columns){
+			l.add(c.get(row));
 		}
 		return l;
 	}

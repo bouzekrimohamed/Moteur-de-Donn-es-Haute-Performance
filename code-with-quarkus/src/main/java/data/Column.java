@@ -20,8 +20,11 @@ public class Column {
 		return data.size();
 	}
 
-	public void toggleId(){
-		isId=!isId;
+	public void setId(){
+		isId=true;
+	}
+	public void unsetId(){
+		isId=false;
 	}
 
 	public boolean isId(){
