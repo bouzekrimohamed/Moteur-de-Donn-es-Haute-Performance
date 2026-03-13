@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7ca90be4-d187-4bb1-8d69-8283add749d9" name="Changes" comment="Création de la structure de données">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/java/data/Column.java" beforeDir="false" afterPath="$PROJECT_DIR$/code-with-quarkus/src/main/java/data/Column.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code-with-quarkus/src/main/java/data/Table.java" beforeDir="false" afterPath="$PROJECT_DIR$/code-with-quarkus/src/main/java/data/Table.java" afterDir="false" />
-    </list>
+    <list default="true" id="7ca90be4-d187-4bb1-8d69-8283add749d9" name="Changes" comment="Création de la structure" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -23,22 +19,22 @@
     &quot;assignee&quot;: &quot;AbelFEL&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/bouzekrimohamed/Moteur-de-Donn-es-Haute-Performance.git",
-    "accountId": "93827b2a-6fb0-48be-9c75-1292a0292b44"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/bouzekrimohamed/Moteur-de-Donn-es-Haute-Performance.git&quot;,
+    &quot;accountId&quot;: &quot;93827b2a-6fb0-48be-9c75-1292a0292b44&quot;
   },
-  "recentNewPullRequestHead": {
-    "server": {
-      "useHttp": false,
-      "host": "github.com",
-      "port": null,
-      "suffix": null
+  &quot;recentNewPullRequestHead&quot;: {
+    &quot;server&quot;: {
+      &quot;useHttp&quot;: false,
+      &quot;host&quot;: &quot;github.com&quot;,
+      &quot;port&quot;: null,
+      &quot;suffix&quot;: null
     },
-    "owner": "bouzekrimohamed",
-    "repository": "Moteur-de-Donn-es-Haute-Performance"
+    &quot;owner&quot;: &quot;bouzekrimohamed&quot;,
+    &quot;repository&quot;: &quot;Moteur-de-Donn-es-Haute-Performance&quot;
   }
-}]]></component>
+}</component>
   <component name="MavenImportPreferences">
     <option name="generalSettings">
       <MavenGeneralSettings>
@@ -54,26 +50,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "Structure-java",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "run.code.analysis.last.selected.profile": "pProject Default",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Structure-java&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\code-with-quarkus\src\main\java\data" />
@@ -120,7 +116,7 @@
       <updated>1770994732354</updated>
       <workItem from="1770994739031" duration="2198000" />
       <workItem from="1770997484463" duration="3453000" />
-      <workItem from="1773409484255" duration="3339000" />
+      <workItem from="1773409484255" duration="3408000" />
     </task>
     <task id="LOCAL-00001" summary="Création de la structure de données">
       <option name="closed" value="true" />
@@ -162,7 +158,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773410969744</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Création de la structure">
+      <option name="closed" value="true" />
+      <created>1773412896742</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1773412896742</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -171,6 +175,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Update" />
     <MESSAGE value="Création de la structure de données" />
-    <option name="LAST_COMMIT_MESSAGE" value="Création de la structure de données" />
+    <MESSAGE value="Merge remote-tracking branch 'origin/Structure-java' into Structure-java&#10;&#10;# Conflicts:&#10;#&#9;.idea/workspace.xml&#10;#&#9;code-with-quarkus/src/main/java/data/Column.java&#10;#&#9;code-with-quarkus/src/main/java/data/Table.java" />
+    <MESSAGE value="Création de la structure" />
+    <option name="LAST_COMMIT_MESSAGE" value="Création de la structure" />
   </component>
 </project>
