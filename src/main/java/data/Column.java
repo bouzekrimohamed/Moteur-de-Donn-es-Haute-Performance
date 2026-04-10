@@ -5,7 +5,6 @@ import java.util.List;
 
 public class Column {
 	private String name;
-	private boolean isId=false;
 	private List<Object> data= new ArrayList<>();
 
 	public Column(String s){
@@ -20,19 +19,19 @@ public class Column {
 		return data.size();
 	}
 
-	public void setId(){
-		isId=true;
-	}
-	public void unsetId(){
-		isId=false;
-	}
-
-	public boolean isId(){
-		return isId;
-	}
-
 	public Object get(int index){
 		return data.get(index);
+	}
+
+	public int getIndex (Object o){
+		int i=0;
+		for (Object x : data){
+			if(x==o){
+				return i;
+			}
+			i++;
+		}
+		return null;
 	}
 
 	public String getName() {
