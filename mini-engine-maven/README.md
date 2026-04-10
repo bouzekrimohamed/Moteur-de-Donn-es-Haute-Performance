@@ -65,3 +65,70 @@ If you want to learn more about building native executables, please consult <htt
 Easily start your REST Web Services
 
 [Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
+
+## Engine API (stage 1-2)
+
+Current foundation focuses on:
+- table schema creation
+- table listing and schema retrieval
+- data loading contract (placeholder)
+- query contract (placeholder)
+
+### Main endpoints
+
+- `POST /tables`
+- `GET /tables`
+- `GET /tables/{tableName}`
+- `POST /tables/{tableName}/load`
+- `POST /query`
+
+### Quick test with curl
+
+Create a table:
+
+```bash
+curl -X POST http://localhost:8080/tables \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tableName": "users",
+    "columns": [
+      { "name": "id", "type": "INT" },
+      { "name": "name", "type": "STRING" },
+      { "name": "active", "type": "BOOLEAN" }
+    ]
+  }'
+```
+
+List tables:
+
+```bash
+curl http://localhost:8080/tables
+```
+
+Get one schema:
+
+```bash
+curl http://localhost:8080/tables/users
+```
+
+Prepare data loading:
+
+```bash
+curl -X POST http://localhost:8080/tables/users/load \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rows": [
+      { "id": 1, "name": "Alice", "active": true }
+    ]
+  }'
+```
+
+Prepare query call:
+
+```bash
+curl -X POST http://localhost:8080/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM users"
+  }'
+```
