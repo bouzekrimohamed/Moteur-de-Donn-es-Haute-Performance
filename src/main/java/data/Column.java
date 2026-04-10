@@ -4,16 +4,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Column {
-	private String name;
-	private List<Object> data= new ArrayList<>();
+	private final String name;
+	private final List<Object> data;
+
+	public Column (String s, List<Object> l){
+		name=s;
+		data=l;
+	}
 
 	public Column(String s){
-		name=s;
+		this(s, new ArrayList<Object>());
 	}
 
-	public void add(Object elem){
-		data.add(elem);
+	public boolean add(Object elem){
+		return data.add(elem);
 	}
+
+	public boolean remove(Object o){ return data.remove(o);}
 
 	public int size(){
 		return data.size();
@@ -26,21 +33,22 @@ public class Column {
 	public int getIndex (Object o){
 		int i=0;
 		for (Object x : data){
-			if(x==o){
+			if(x.equals(o)){
 				return i;
 			}
 			i++;
 		}
-		return null;
+		return -1;
 	}
 
 	public String getName() {
 		return name;
 	}
 
-	public List<Object> clone(){
+	@Override
+    public Column clone(){
 		List<Object> clone=new ArrayList<>();
         clone.addAll(data);
-		return clone;
+		return new Column(name, clone);
 	}
 }
