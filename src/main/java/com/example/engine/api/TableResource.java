@@ -1,19 +1,12 @@
 package com.example.engine.api;
 
 import com.example.engine.core.TableManager;
-<<<<<<< Updated upstream
-import com.example.engine.model.CreateTableRequest;
-=======
->>>>>>> Stashed changes
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.MediaType;
 
-<<<<<<< Updated upstream
-import java.io.IOException;
-=======
 import java.util.List;
->>>>>>> Stashed changes
 import java.util.Map;
 
 @Path("/tables")
@@ -25,14 +18,6 @@ public class TableResource {
     TableManager tableManager;
 
     @POST
-<<<<<<< Updated upstream
-    public Map<String, Object> create(CreateTableRequest req) throws IOException {
-        tableManager.createTable(req);
-        return Map.of(
-                "status", "OK",
-                "table", req.name
-        );
-=======
     public Response create(CreateTableRequest req) {
         try {
             TableManager.TableSchema table = tableManager.createTable(req.tableName, req.columns);
@@ -115,6 +100,5 @@ public class TableResource {
             this.message = message;
             this.acceptedRows = acceptedRows;
         }
->>>>>>> Stashed changes
     }
 }
