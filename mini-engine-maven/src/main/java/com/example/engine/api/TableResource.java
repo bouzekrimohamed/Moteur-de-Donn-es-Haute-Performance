@@ -1,12 +1,19 @@
 package com.example.engine.api;
 
 import com.example.engine.core.TableManager;
+<<<<<<< Updated upstream
 import com.example.engine.model.CreateTableRequest;
+=======
+>>>>>>> Stashed changes
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 
+<<<<<<< Updated upstream
 import java.io.IOException;
+=======
+import java.util.List;
+>>>>>>> Stashed changes
 import java.util.Map;
 
 @Path("/tables")
@@ -18,11 +25,96 @@ public class TableResource {
     TableManager tableManager;
 
     @POST
+<<<<<<< Updated upstream
     public Map<String, Object> create(CreateTableRequest req) throws IOException {
         tableManager.createTable(req);
         return Map.of(
                 "status", "OK",
                 "table", req.name
         );
+=======
+    public Response create(CreateTableRequest req) {
+        try {
+            TableManager.TableSchema table = tableManager.createTable(req.tableName, req.columns);
+            return Response.status(Response.Status.CREATED).entity(table).build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse(ex.getMessage()))
+                    .build();
+        }
+    }
+
+    @GET
+    public List<TableManager.TableSchema> listTables() {
+        return tableManager.listTables();
+    }
+
+    @GET
+    @Path("/{tableName}")
+    public Response getTable(@PathParam("tableName") String tableName) {
+        try {
+            return Response.ok(tableManager.getTable(tableName)).build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse(ex.getMessage()))
+                    .build();
+        }
+    }
+
+    @POST
+    @Path("/{tableName}/load")
+    public Response load(@PathParam("tableName") String tableName, LoadDataRequest request) {
+        try {
+            int accepted = tableManager.loadRows(tableName, request.rows);
+            LoadDataResponse response = new LoadDataResponse("ACCEPTED", "Rows loaded in memory successfully.", accepted);
+            return Response.status(Response.Status.ACCEPTED).entity(response).build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ErrorResponse(ex.getMessage()))
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/{tableName}/rows")
+    public Response getRows(@PathParam("tableName") String tableName) {
+        try {
+            List<Map<String, Object>> rows = tableManager.getRows(tableName);
+            return Response.ok(rows).build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse(ex.getMessage()))
+                    .build();
+        }
+    }
+
+    public static class ErrorResponse {
+        public final String error;
+
+        public ErrorResponse(String error) {
+            this.error = error;
+        }
+    }
+
+    public static class CreateTableRequest {
+        public String tableName;
+        public List<TableManager.ColumnDef> columns;
+    }
+
+    public static class LoadDataRequest {
+        public List<Map<String, Object>> rows;
+    }
+
+    public static class LoadDataResponse {
+        public String status;
+        public String message;
+        public int acceptedRows;
+
+        public LoadDataResponse(String status, String message, int acceptedRows) {
+            this.status = status;
+            this.message = message;
+            this.acceptedRows = acceptedRows;
+        }
+>>>>>>> Stashed changes
     }
 }
