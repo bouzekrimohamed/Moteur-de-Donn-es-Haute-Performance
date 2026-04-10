@@ -4,7 +4,7 @@ import com.example.engine.core.TableManager;
 import com.example.engine.model.CreateTableRequest;
 import com.example.engine.model.LoadDataRequest;
 import com.example.engine.model.LoadDataResponse;
-import com.example.engine.model.Schema;
+import com.example.engine.model.Table;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
@@ -23,8 +23,8 @@ public class TableResource {
     @POST
     public Response create(CreateTableRequest req) {
         try {
-            Schema schema = tableManager.createTable(req);
-            return Response.status(Response.Status.CREATED).entity(schema).build();
+            Table table = tableManager.createTable(req);
+            return Response.status(Response.Status.CREATED).entity(table).build();
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new ErrorResponse(ex.getMessage()))
@@ -33,7 +33,7 @@ public class TableResource {
     }
 
     @GET
-    public List<Schema> listTables() {
+    public List<Table> listTables() {
         return tableManager.listTables();
     }
 
@@ -70,3 +70,5 @@ public class TableResource {
         }
     }
 }
+
+

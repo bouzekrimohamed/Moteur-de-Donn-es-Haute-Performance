@@ -4,14 +4,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class Schema {
+public class Table {
     private String tableName;
     private List<Column> columns;
 
-    public Schema() {
+    public Table() {
     }
 
-    public Schema(String tableName, List<Column> columns) {
+    public Table(String tableName, List<Column> columns) {
         this.tableName = tableName;
         this.columns = new ArrayList<>(columns);
     }

@@ -6,7 +6,7 @@ import com.example.engine.model.LoadDataRequest;
 import com.example.engine.model.LoadDataResponse;
 import com.example.engine.model.QueryRequest;
 import com.example.engine.model.QueryResponse;
-import com.example.engine.model.Schema;
+import com.example.engine.model.Table;
 import com.example.engine.storage.SchemaStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -22,7 +22,7 @@ public class TableManager {
     @Inject
     SchemaStore schemaStore;
 
-    public Schema createTable(CreateTableRequest req) {
+    public Table createTable(CreateTableRequest req) {
         if (req == null || req.getTableName() == null || req.getTableName().isBlank()) {
             throw new IllegalArgumentException("Table name is required");
         }
@@ -39,18 +39,18 @@ public class TableManager {
             throw new IllegalStateException("Table already exists: " + tableName);
         }
 
-        Schema schema = new Schema(tableName, columns);
-        schemaStore.save(schema);
-        return schema;
+        Table table = new Table(tableName, columns);
+        schemaStore.save(table);
+        return table;
     }
 
-    public List<Schema> listTables() {
+    public List<Table> listTables() {
         return schemaStore.findAll().stream()
-                .sorted(Comparator.comparing(Schema::getTableName))
+                .sorted(Comparator.comparing(Table::getTableName))
                 .toList();
     }
 
-    public Schema getTable(String tableName) {
+    public Table getTable(String tableName) {
         validateTableName(tableName);
         return schemaStore.findByName(tableName.trim())
                 .orElseThrow(() -> new IllegalArgumentException("Table not found: " + tableName));

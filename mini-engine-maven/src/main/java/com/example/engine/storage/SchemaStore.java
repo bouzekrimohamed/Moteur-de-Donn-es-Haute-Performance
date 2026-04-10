@@ -1,6 +1,6 @@
 package com.example.engine.storage;
 
-import com.example.engine.model.Schema;
+import com.example.engine.model.Table;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -11,21 +11,21 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
 public class SchemaStore {
-    private final Map<String, Schema> schemasByTableName = new ConcurrentHashMap<>();
+    private final Map<String, Table> tablesByName = new ConcurrentHashMap<>();
 
     public boolean exists(String tableName) {
-        return schemasByTableName.containsKey(tableName);
+        return tablesByName.containsKey(tableName);
     }
 
-    public void save(Schema schema) {
-        schemasByTableName.put(schema.getTableName(), schema);
+    public void save(Table table) {
+        tablesByName.put(table.getTableName(), table);
     }
 
-    public Optional<Schema> findByName(String tableName) {
-        return Optional.ofNullable(schemasByTableName.get(tableName));
+    public Optional<Table> findByName(String tableName) {
+        return Optional.ofNullable(tablesByName.get(tableName));
     }
 
-    public List<Schema> findAll() {
-        return new ArrayList<>(schemasByTableName.values());
+    public List<Table> findAll() {
+        return new ArrayList<>(tablesByName.values());
     }
 }
