@@ -6,7 +6,7 @@ public class Main {
 
         System.out.println("Table : " + table.getName());
         for (Column col : table.getColumns()) {
-            System.out.println("  Colonne : " + col.getName());
+            System.out.println("    Colonne : " + col.getName() + ", Premier élément : "+ col.get(0));
         }
     }
 }
