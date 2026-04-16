@@ -6,8 +6,10 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         // Charge la table depuis un fichier Parquet
-        Table table = ParquetReader.load("C:/Users/abel/Documents/Sorbonne/L3/S6/yellow_tripdata_2025-01.parquet");
+        //Table table = ParquetReader.load("C:/Users/abel/Documents/Sorbonne/L3/S6/yellow_tripdata_2025-01.parquet");
 
+        //Charge la table depuis un fichier .csv
+        Table table = CsvLoader.load("C:/Users/hoang/OneDrive/Documents/Etudes & Langues/L3/117/customers-100.csv");
         List<Column> columns = table.getColumns();
         if (columns.isEmpty()) {
             System.out.println("La table est vide.");
