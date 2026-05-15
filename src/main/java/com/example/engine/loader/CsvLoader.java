@@ -42,6 +42,21 @@ public class CsvLoader {
             List<Column> tableCols = table.getColumnsInternal();
             validateHeaders(headers, tableCols, filePath);
 
+            // Mise en cache des références de colonnes et de leurs types — évite
+            // une recherche linéaire dans table.getColumn() pour chaque champ de chaque ligne.
+            int nbCols = headers.length;
+            Column[] cols  = new Column[nbCols];
+            String[] types = new String[nbCols];
+            for (int i = 0; i < nbCols; i++) {
+                cols[i]  = table.getColumn(headers[i].trim());
+                types[i] = cols[i].getType();
+            }
+
+            // Pré-allocation : estimation de la taille à partir de la taille du fichier
+            long fileSize = new java.io.File(filePath).length();
+            int estimatedRows = (int) Math.min(fileSize / 30, 5_000_000);
+            for (Column col : cols) col.ensureCapacity(estimatedRows);
+
             // 3. Lire les lignes de données
             int loaded = 0;
             String line;
@@ -52,19 +67,15 @@ public class CsvLoader {
                 if (line.isBlank()) continue;
 
                 String[] fields = splitLine(line, separator);
-                if (fields.length != headers.length) {
+                if (fields.length != nbCols) {
                     System.err.printf("[CsvLoader] Ligne %d ignorée : %d champs attendus, %d trouvés%n",
-                            lineNumber, headers.length, fields.length);
+                            lineNumber, nbCols, fields.length);
                     continue;
                 }
 
-                // Insérer chaque valeur dans la bonne colonne
-                for (int i = 0; i < headers.length; i++) {
-                    String colName = headers[i];
-                    String raw = fields[i].trim();
-                    Column col = table.getColumn(colName);
-                    Object value = parseValue(raw, col.getType());
-                    col.add(value);
+                // Insertion via les références en cache — pas de recherche linéaire
+                for (int i = 0; i < nbCols; i++) {
+                    cols[i].add(parseValue(fields[i].trim(), types[i]));
                 }
                 loaded++;
             }

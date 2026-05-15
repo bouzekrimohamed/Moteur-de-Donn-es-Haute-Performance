@@ -25,6 +25,11 @@ public class Column {
         return data.add(elem);
     }
 
+    /** Pré-alloue la capacité interne pour éviter les redimensionnements lors d'un gros chargement. */
+    public void ensureCapacity(int capacity) {
+        ((ArrayList<Object>) data).ensureCapacity(capacity);
+    }
+
     public boolean remove(Object o) {
         return data.remove(o);
     }

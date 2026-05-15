@@ -4,6 +4,8 @@ import com.example.engine.storage.Column;
 import com.example.engine.storage.Table;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Moteur de requêtes en mémoire.
@@ -60,23 +62,20 @@ public class QueryEngine {
         return result;
     }
 
-    // WHERE
+    // WHERE — scan parallèle sur les indices de lignes
     private List<Integer> applyWhere(Table table, WhereClause where) {
-        List<Integer> result = new ArrayList<>();
         int total = table.rowCount();
 
         if (where == null) {
-            for (int i = 0; i < total; i++) result.add(i);
-            return result;
+            return IntStream.range(0, total).boxed().collect(Collectors.toList());
         }
 
         Column col = table.getColumn(where.column);
-        for (int i = 0; i < total; i++) {
-            if (matches(col.get(i), where.operator, where.value)) {
-                result.add(i);
-            }
-        }
-        return result;
+        return IntStream.range(0, total)
+                .parallel()
+                .filter(i -> matches(col.get(i), where.operator, where.value))
+                .boxed()
+                .collect(Collectors.toList());
     }
 
     private boolean matches(Object cellValue, String operator, Object filterValue) {
@@ -85,26 +84,39 @@ public class QueryEngine {
         switch (operator.toUpperCase()) {
             case "=":
             case "==":
+                // Comparaison directe pour les types numériques — évite toString()
+                if (cellValue instanceof Number cn && filterValue instanceof Number fn)
+                    return cn.doubleValue() == fn.doubleValue();
                 return cellValue.toString().equals(filterValue.toString());
             case "!=":
             case "<>":
+                if (cellValue instanceof Number cn && filterValue instanceof Number fn)
+                    return cn.doubleValue() != fn.doubleValue();
                 return !cellValue.toString().equals(filterValue.toString());
             case "CONTAINS":
                 return cellValue.toString().contains(filterValue.toString());
             default:
-                try {
-                    double cell   = Double.parseDouble(cellValue.toString());
-                    double filter = Double.parseDouble(filterValue.toString());
-                    return switch (operator) {
-                        case "<"  -> cell < filter;
-                        case ">"  -> cell > filter;
-                        case "<=" -> cell <= filter;
-                        case ">=" -> cell >= filter;
-                        default   -> false;
-                    };
-                } catch (NumberFormatException e) {
-                    return false;
+                // Extraction numérique sans toString() quand la valeur est déjà typée
+                double cell, filter;
+                if (cellValue instanceof Number cn) {
+                    cell = cn.doubleValue();
+                } else {
+                    try { cell = Double.parseDouble(cellValue.toString()); }
+                    catch (NumberFormatException e) { return false; }
                 }
+                if (filterValue instanceof Number fn) {
+                    filter = fn.doubleValue();
+                } else {
+                    try { filter = Double.parseDouble(filterValue.toString()); }
+                    catch (NumberFormatException e) { return false; }
+                }
+                return switch (operator) {
+                    case "<"  -> cell < filter;
+                    case ">"  -> cell > filter;
+                    case "<=" -> cell <= filter;
+                    case ">=" -> cell >= filter;
+                    default   -> false;
+                };
         }
     }
 
@@ -153,10 +165,12 @@ public class QueryEngine {
                         if (upper.startsWith(agg + "(") && upper.endsWith(")")) {
                             String colName = sel.substring(agg.length() + 1, sel.length() - 1).trim();
                             Column aggCol = table.getColumn(colName);
-                            List<Double> values = new ArrayList<>();
+                            List<Double> values = new ArrayList<>(entry.getValue().size());
                             for (int idx : entry.getValue()) {
                                 Object v = aggCol.get(idx);
-                                if (v != null) {
+                                if (v instanceof Number n) {
+                                    values.add(n.doubleValue()); // cast direct — évite parseDouble
+                                } else if (v != null) {
                                     try { values.add(Double.parseDouble(v.toString())); }
                                     catch (NumberFormatException ignored) {}
                                 }
