@@ -1,0 +1,314 @@
+exemples execution
+
+
+BASE URL : http://localhost:8080
+
+ÉTAPE 0 — Vérifier que le serveur répond
+
+
+  Méthode : GET
+  URL     : http://localhost:8080/tables
+
+  Réponse attendue : []   (liste vide, aucune table pour l'instant)
+
+
+  PARTIE 1 — DONNÉES MANUELLES (JSON)
+
+ÉTAPE 1 — Créer une table
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables
+  Body (raw JSON) :
+
+{
+  "tableName": "employes",
+  "columns": [
+    { "name": "id",      "type": "INT"    },
+    { "name": "nom",     "type": "STRING" },
+    { "name": "ville",   "type": "STRING" },
+    { "name": "salaire", "type": "DOUBLE" },
+    { "name": "age",     "type": "INT"    }
+  ]
+}
+
+  Réponse attendue : HTTP 201 + schéma de la table
+
+  Types disponibles : STRING, INT, LONG, DOUBLE, BOOLEAN
+
+
+ÉTAPE 2 — Charger des données
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/load
+  Body (raw JSON) :
+
+{
+  "rows": [
+    { "id": 1, "nom": "Alice",   "ville": "Paris", "salaire": 3500.0, "age": 30 },
+    { "id": 2, "nom": "Bob",     "ville": "Lyon",  "salaire": 2800.0, "age": 25 },
+    { "id": 3, "nom": "Charlie", "ville": "Paris", "salaire": 4200.0, "age": 35 },
+    { "id": 4, "nom": "Diana",   "ville": "Lyon",  "salaire": 3100.0, "age": 28 },
+    { "id": 5, "nom": "Eve",     "ville": "Paris", "salaire": 3800.0, "age": 32 },
+    { "id": 6, "nom": "Frank",   "ville": "Lyon",  "salaire": 2600.0, "age": 22 }
+  ]
+}
+
+  Réponse attendue : HTTP 202 + "acceptedRows": 6
+
+
+
+ÉTAPE 3 — SELECT * (toutes les lignes)
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{}
+
+  Réponse attendue : les 6 lignes
+
+
+ÉTAPE 4 — SELECT (colonnes précises)
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "select": ["nom", "salaire"]
+}
+
+  Réponse attendue : seulement les colonnes nom et salaire
+
+
+
+ÉTAPE 5 — WHERE (filtre simple)
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "where": { "column": "age", "operator": ">", "value": 28 }
+}
+
+  Réponse attendue : Alice (30), Charlie (35), Eve (32)
+
+  ---- Autre exemple WHERE avec CONTAINS ----
+
+{
+  "where": { "column": "ville", "operator": "CONTAINS", "value": "ar" }
+}
+
+  Réponse attendue : les employés de Paris (contient "ar")
+
+  Opérateurs disponibles : =   !=   <   >   <=   >=   CONTAINS
+
+
+
+ÉTAPE 6 — SELECT + WHERE combinés
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "select": ["nom", "salaire"],
+  "where":  { "column": "ville", "operator": "=", "value": "Paris" }
+}
+
+  Réponse attendue : nom et salaire des employés de Paris uniquement
+
+
+
+ÉTAPE 7 — GROUP BY (regroupement)
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "groupBy": "ville"
+}
+
+  Réponse attendue : Paris → count 3, Lyon → count 3
+
+
+
+ÉTAPE 8 — GROUP BY + agrégations (SUM, AVG, MAX, MIN)
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "select":  ["SUM(salaire)", "AVG(salaire)", "MAX(salaire)", "MIN(salaire)"],
+  "groupBy": "ville"
+}
+
+  Réponse attendue :
+    Paris → SUM=11500, AVG≈3833, MAX=4200, MIN=3500
+    Lyon  → SUM=8500,  AVG≈2833, MAX=3100, MIN=2600
+
+
+
+ÉTAPE 9 — ORDER BY + LIMIT
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "orderBy":  "salaire",
+  "orderAsc": false,
+  "limit":    3
+}
+
+  Réponse attendue : les 3 salaires les plus élevés (Charlie, Eve, Alice)
+
+
+
+ÉTAPE 10 — Requête complète (SELECT + WHERE + ORDER BY + LIMIT)
+
+
+  Méthode : POST
+  URL     : http://localhost:8080/tables/employes/query
+  Body (raw JSON) :
+
+{
+  "select":   ["nom", "salaire"],
+  "where":    { "column": "salaire", "operator": ">=", "value": 3000 },
+  "orderBy":  "salaire",
+  "orderAsc": false,
+  "limit":    3
+}
+
+  Réponse attendue : les 3 mieux payés parmi ceux gagnant >= 3000
+
+
+
+  PARTIE 2 — CHARGEMENT FICHIERS (CSV / PARQUET)
+
+
+
+ÉTAPE 11 — Importer un fichier CSV
+
+
+
+  Format CSV attendu (première ligne = en-tête) :
+    id,nom,ville,salaire,age
+    1,Alice,Paris,3500.0,30
+    2,Bob,Lyon,2800.0,25
+
+  a) Créer la table d'abord (même schéma que le CSV) :
+
+  POST http://localhost:8080/tables
+{
+  "tableName": "employes_csv",
+  "columns": [
+    { "name": "id",      "type": "INT"    },
+    { "name": "nom",     "type": "STRING" },
+    { "name": "ville",   "type": "STRING" },
+    { "name": "salaire", "type": "DOUBLE" },
+    { "name": "age",     "type": "INT"    }
+  ]
+}
+
+  b) Charger le fichier :
+
+  POST http://localhost:8080/tables/employes_csv/load/csv
+{
+"filePath": "C:/Users/mehdi/Downloads/employes.csv"
+}
+  Réponse attendue : HTTP 202 + nombre de lignes chargées
+
+
+ÉTAPE 12 — Importer un fichier Parquet (création automatique de table)
+
+
+  !! Remplacer le filePath par le vrai chemin du fichier .parquet !!
+
+  POST http://localhost:8080/tables/import/parquet
+{
+  "filePath": "C:/Users/mehdi/Downloads/yellow_tripdata_2025-01.parquet"
+}
+
+  Réponse attendue : HTTP 201 + nom de la table créée + nombre de lignes
+
+  → Le schéma (colonnes + types) est déduit automatiquement du fichier.
+  → Le nom de la table = nom du fichier sans extension.
+
+
+
+ÉTAPE 13 — Vérifier les tables créées
+
+
+  Méthode : GET
+  URL     : http://localhost:8080/tables
+
+  Réponse attendue : liste de toutes les tables en mémoire
+
+
+ÉTAPE 14 — Supprimer une table
+
+
+  Méthode : DELETE
+  URL     : http://localhost:8080/tables/employes
+
+  Réponse attendue : HTTP 200 + confirmation
+
+
+===========================================================================
+  RÉCAPITULATIF DES ENDPOINTS
+===========================================================================
+
+  POST   /tables                       → créer une table
+  GET    /tables                       → lister toutes les tables
+  GET    /tables/{nom}                 → voir le schéma d'une table
+  DELETE /tables/{nom}                 → supprimer une table
+  POST   /tables/{nom}/load            → charger des lignes JSON
+  GET    /tables/{nom}/rows            → lire toutes les lignes brutes
+  POST   /tables/{nom}/load/csv        → charger un fichier CSV
+  POST   /tables/{nom}/load/parquet    → charger un fichier Parquet
+  POST   /tables/import/parquet        → importer Parquet (table auto)
+  POST   /tables/{nom}/query           → exécuter une requête
+
+
+===========================================================================
+  RESET RAPIDE ENTRE DEUX ESSAIS
+===========================================================================
+
+  Méthode 1 — Reset complet (recommandé avant la soutenance) :
+    Ctrl+C dans le terminal  →  .\mvnw quarkus:dev
+    Tout est en mémoire, redémarrer = table rase.
+
+  Méthode 2 — Supprimer table par table sans redémarrer :
+    DELETE http://localhost:8080/tables/employes
+    DELETE http://localhost:8080/tables/employes_csv
+    (une requête DELETE par table)
+
+  Méthode 3 — Vérifier que tout est vide :
+    GET http://localhost:8080/tables  →  doit retourner []
+
+
+===========================================================================
+  EN CAS DE PROBLÈME
+===========================================================================
+
+  Port déjà utilisé →  changer dans application.properties :
+    quarkus.http.port=8081
+  puis utiliser http://localhost:8081
+
+  Quarkus ne démarre pas → vérifier Java :
+    java -version  (doit afficher 17 ou 21)
+
+  Postman n'envoie rien → vérifier le header :
+    Content-Type : application/json

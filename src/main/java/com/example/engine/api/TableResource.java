@@ -3,8 +3,8 @@ package com.example.engine.api;
 import com.example.engine.core.TableManager;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 import java.util.List;
 import java.util.Map;
@@ -17,23 +17,25 @@ public class TableResource {
     @Inject
     TableManager tableManager;
 
+    /** Créer une table */
     @POST
     public Response create(CreateTableRequest req) {
         try {
-            TableManager.TableSchema table = tableManager.createTable(req.tableName, req.columns);
-            return Response.status(Response.Status.CREATED).entity(table).build();
+            TableManager.TableSchema schema = tableManager.createTable(req.tableName, req.columns);
+            return Response.status(Response.Status.CREATED).entity(schema).build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse(ex.getMessage()))
-                    .build();
+                    .entity(new ErrorResponse(ex.getMessage())).build();
         }
     }
 
+    /** Lister toutes les tables */
     @GET
     public List<TableManager.TableSchema> listTables() {
         return tableManager.listTables();
     }
 
+    /** Voir le schéma d'une table */
     @GET
     @Path("/{tableName}")
     public Response getTable(@PathParam("tableName") String tableName) {
@@ -41,45 +43,51 @@ public class TableResource {
             return Response.ok(tableManager.getTable(tableName)).build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ErrorResponse(ex.getMessage()))
-                    .build();
+                    .entity(new ErrorResponse(ex.getMessage())).build();
         }
     }
 
+    /** Supprimer une table */
+    @DELETE
+    @Path("/{tableName}")
+    public Response dropTable(@PathParam("tableName") String tableName) {
+        try {
+            tableManager.dropTable(tableName);
+            return Response.ok(Map.of("status", "OK", "message", "Table supprimée : " + tableName)).build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorResponse(ex.getMessage())).build();
+        }
+    }
+
+    /** Charger des lignes en mémoire */
     @POST
     @Path("/{tableName}/load")
     public Response load(@PathParam("tableName") String tableName, LoadDataRequest request) {
         try {
-            int accepted = tableManager.loadRows(tableName, request.rows);
-            LoadDataResponse response = new LoadDataResponse("ACCEPTED", "Rows loaded in memory successfully.", accepted);
-            return Response.status(Response.Status.ACCEPTED).entity(response).build();
+            int count = tableManager.loadRows(tableName, request.rows);
+            return Response.status(Response.Status.ACCEPTED)
+                    .entity(new LoadDataResponse("ACCEPTED", count + " lignes chargées.", count))
+                    .build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorResponse(ex.getMessage()))
-                    .build();
+                    .entity(new ErrorResponse(ex.getMessage())).build();
         }
     }
 
+    /** Lire toutes les lignes brutes */
     @GET
     @Path("/{tableName}/rows")
     public Response getRows(@PathParam("tableName") String tableName) {
         try {
-            List<Map<String, Object>> rows = tableManager.getRows(tableName);
-            return Response.ok(rows).build();
+            return Response.ok(tableManager.getRows(tableName)).build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ErrorResponse(ex.getMessage()))
-                    .build();
+                    .entity(new ErrorResponse(ex.getMessage())).build();
         }
     }
 
-    public static class ErrorResponse {
-        public final String error;
-
-        public ErrorResponse(String error) {
-            this.error = error;
-        }
-    }
+    // --- DTOs ---
 
     public static class CreateTableRequest {
         public String tableName;
@@ -94,11 +102,11 @@ public class TableResource {
         public String status;
         public String message;
         public int acceptedRows;
+        public LoadDataResponse(String s, String m, int r) { status=s; message=m; acceptedRows=r; }
+    }
 
-        public LoadDataResponse(String status, String message, int acceptedRows) {
-            this.status = status;
-            this.message = message;
-            this.acceptedRows = acceptedRows;
-        }
+    public static class ErrorResponse {
+        public String error;
+        public ErrorResponse(String e) { error = e; }
     }
 }

@@ -1,134 +1,152 @@
-# mini-moteur
+# Moteur de Données Haute Performance
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Mini moteur de données en mémoire exposé via une API REST (Quarkus).
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Lancer le projet
 
-## Running the application in dev mode
-
-You can run your application in dev mode that enables live coding using:
-
-```shell script
+```bash
 ./mvnw quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+L'API est accessible sur `http://localhost:8080`.
 
-## Packaging and running the application
+---
 
-The application can be packaged using:
+## Endpoints disponibles
 
-```shell script
-./mvnw package
+### 1. Créer une table
+
+```http
+POST /tables
+Content-Type: application/json
+
+{
+  "tableName": "employes",
+  "columns": [
+    { "name": "id",     "type": "INT"    },
+    { "name": "nom",    "type": "STRING" },
+    { "name": "ville",  "type": "STRING" },
+    { "name": "salaire","type": "DOUBLE" },
+    { "name": "age",    "type": "INT"    }
+  ]
+}
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+Types supportés : `STRING`, `INT`, `LONG`, `DOUBLE`, `BOOLEAN`
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+---
 
-If you want to build an _über-jar_, execute the following command:
+### 2. Charger des données
 
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
+```http
+POST /tables/employes/load
+Content-Type: application/json
+
+{
+  "rows": [
+    { "id": 1, "nom": "Alice",   "ville": "Paris",   "salaire": 3500.0, "age": 30 },
+    { "id": 2, "nom": "Bob",     "ville": "Lyon",    "salaire": 2800.0, "age": 25 },
+    { "id": 3, "nom": "Charlie", "ville": "Paris",   "salaire": 4200.0, "age": 35 },
+    { "id": 4, "nom": "Diana",   "ville": "Lyon",    "salaire": 3100.0, "age": 28 }
+  ]
+}
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
+---
 
-## Creating a native executable
+### 3. Requêtes
 
-You can create a native executable using:
-
-```shell script
-./mvnw package -Dnative
+```http
+POST /tables/employes/query
+Content-Type: application/json
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
-
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
+#### SELECT * (toutes les colonnes)
+```json
+{}
 ```
 
-You can then execute your native executable with: `./target/mini-moteur-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
-
-## Related Guides
-
-- REST ([guide](https://quarkus.io/guides/rest)): A Jakarta REST implementation utilizing build time processing and Vert.x. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it.
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-
-## Provided Code
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
-
-## Engine API (stage 1-2)
-
-Current foundation focuses on:
-- table schema creation
-- table listing and schema retrieval
-- data loading contract (placeholder)
-- query contract (placeholder)
-
-### Main endpoints
-
-- `POST /tables`
-- `GET /tables`
-- `GET /tables/{tableName}`
-- `POST /tables/{tableName}/load`
-- `POST /query`
-
-### Quick test with curl
-
-Create a table:
-
-```bash
-curl -X POST http://localhost:8080/tables \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tableName": "users",
-    "columns": [
-      { "name": "id", "type": "INT" },
-      { "name": "name", "type": "STRING" },
-      { "name": "active", "type": "BOOLEAN" }
-    ]
-  }'
+#### SELECT colonnes précises
+```json
+{ "select": ["nom", "salaire"] }
 ```
 
-List tables:
-
-```bash
-curl http://localhost:8080/tables
+#### WHERE simple
+```json
+{
+  "where": { "column": "age", "operator": ">", "value": 28 }
+}
 ```
 
-Get one schema:
+Opérateurs WHERE : `=`, `!=`, `<`, `>`, `<=`, `>=`, `CONTAINS`
 
-```bash
-curl http://localhost:8080/tables/users
+#### WHERE + SELECT
+```json
+{
+  "select": ["nom", "ville"],
+  "where": { "column": "ville", "operator": "=", "value": "Paris" }
+}
 ```
 
-Prepare data loading:
-
-```bash
-curl -X POST http://localhost:8080/tables/users/load \
-  -H "Content-Type: application/json" \
-  -d '{
-    "rows": [
-      { "id": 1, "name": "Alice", "active": true }
-    ]
-  }'
+#### GROUP BY
+```json
+{
+  "groupBy": "ville"
+}
 ```
 
-Prepare query call:
+#### GROUP BY + agrégation
+```json
+{
+  "select": ["SUM(salaire)", "AVG(salaire)", "MAX(salaire)"],
+  "groupBy": "ville"
+}
+```
 
-```bash
-curl -X POST http://localhost:8080/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "SELECT * FROM users"
-  }'
+#### ORDER BY + LIMIT
+```json
+{
+  "orderBy": "salaire",
+  "orderAsc": false,
+  "limit": 3
+}
+```
+
+#### Requête complète
+```json
+{
+  "select": ["nom", "salaire"],
+  "where": { "column": "ville", "operator": "=", "value": "Paris" },
+  "orderBy": "salaire",
+  "orderAsc": false,
+  "limit": 10
+}
+```
+
+---
+
+### 4. Autres endpoints
+
+```http
+GET    /tables                  → liste toutes les tables
+GET    /tables/{tableName}      → schéma d'une table
+GET    /tables/{tableName}/rows → toutes les lignes brutes
+DELETE /tables/{tableName}      → supprimer une table
+```
+
+---
+
+## Architecture
+
+```
+com.example.engine
+├── api/
+│   ├── TableResource.java   → endpoints CRUD tables + chargement
+│   └── QueryResource.java   → endpoint requêtes
+├── core/
+│   ├── TableManager.java    → orchestrateur principal (@ApplicationScoped)
+│   └── QueryEngine.java     → moteur SELECT / WHERE / GROUP BY / ORDER BY / LIMIT
+└── storage/
+    ├── Table.java           → représentation d'une table (orientée colonne)
+    └── Column.java          → colonne typée avec stockage List<Object>
 ```
