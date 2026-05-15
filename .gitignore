@@ -1,0 +1,17 @@
+# Build
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Données générées et fichiers lourds
+benchmark/taxi/*.parquet
+benchmark/*.parquet
+benchmark/*.csv
+benchmark/*.json
+benchmark/graphiques/
+
+# Scripts perso
+*.ps1
