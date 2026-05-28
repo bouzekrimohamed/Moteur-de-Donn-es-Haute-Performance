@@ -122,8 +122,8 @@ public class TableManager {
         return getExistingTable(tableName).toRows();
     }
 
-    // Exécution de requête le passe a l'aute fichier
-    public List<Map<String, Object>> query(
+    // Exécution de requête — retourne un résultat colonnaire natif
+    public QueryEngine.QueryResult query(
             String tableName,
             List<String> select,
             QueryEngine.WhereClause where,

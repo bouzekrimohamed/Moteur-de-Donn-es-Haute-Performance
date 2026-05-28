@@ -1,1 +1,4 @@
 com\example\engine\loader\ParquetLoader$1.class
+com\example\engine\core\QueryEngine$1Acc.class
+com\example\engine\api\BenchmarkResource$BenchmarkResult.class
+com\example\engine\api\BenchmarkResource.class

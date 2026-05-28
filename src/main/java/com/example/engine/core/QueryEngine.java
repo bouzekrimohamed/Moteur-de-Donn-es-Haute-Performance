@@ -8,26 +8,68 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * Moteur de requêtes en mémoire.
+ * Moteur de requêtes en mémoire — résultat colonnaire natif.
+ *
+ * Retourne un QueryResult colonnaire : Map<colonne, List<valeurs>>.
+ * Zéro Map allouée par ligne — cohérent avec le stockage Column[].
+ *
  * Supporte : SELECT, WHERE (=, !=, <, >, <=, >=, CONTAINS), GROUP BY,
  *            fonctions d'agrégation (COUNT, SUM, AVG, MIN, MAX),
  *            ORDER BY, LIMIT.
  */
 public class QueryEngine {
 
+    // -------------------------------------------------------------------------
+    // QueryResult — résultat colonnaire
+    // -------------------------------------------------------------------------
+
     /**
-     * Exécute une requête sur une table.
+     * Résultat colonnaire : une List<Object> par colonne.
      *
-     * @param table    la table source
-     * @param select   colonnes à retourner (null ou vide = toutes)
-     * @param where    filtre (null = pas de filtre)
-     * @param groupBy  colonne de regroupement (null = pas de group by)
-     * @param orderBy  colonne de tri (null = pas de tri)
-     * @param orderAsc true = ASC, false = DESC
-     * @param limit    nombre max de lignes (-1 = pas de limite)
-     * @return résultats sous forme de liste de maps
+     * Avant : N Maps row-oriented  → N×M Map.Entry allouées pour rien.
+     * Après : M Lists columnar     → un seul traversal, zéro conversion.
+     *
+     * Exemple JSON résultant :
+     * {
+     *   "columns": {
+     *     "payment_type":      [1,        2,       3     ],
+     *     "count":             [4585922,  653524,  38490 ],
+     *     "SUM(total_amount)": [131910597,14624511,431164]
+     *   }
+     * }
      */
-    public List<Map<String, Object>> query(
+    public record QueryResult(List<String> columns, Map<String, List<Object>> data, int totalRows) {
+
+        /** Tronque à k lignes — utilisé pour LIMIT */
+        public QueryResult truncate(int k) {
+            int n = Math.min(k, totalRows);
+            Map<String, List<Object>> cut = new LinkedHashMap<>();
+            for (String col : columns)
+                cut.put(col, new ArrayList<>(data.get(col).subList(0, n)));
+            return new QueryResult(columns, cut, n);
+        }
+
+        /**
+         * Convertit les maxRows premières lignes en List<Map> (apercu, rétrocompat).
+         * Usage : benchmark apercu, tests unitaires.
+         */
+        public List<Map<String, Object>> toRows(int maxRows) {
+            int n = Math.min(totalRows, maxRows);
+            List<Map<String, Object>> rows = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (String col : columns) row.put(col, data.get(col).get(i));
+                rows.add(row);
+            }
+            return rows;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Point d'entrée
+    // -------------------------------------------------------------------------
+
+    public QueryResult query(
             Table table,
             List<String> select,
             WhereClause where,
@@ -36,21 +78,23 @@ public class QueryEngine {
             boolean orderAsc,
             int limit) {
 
-        // 1. WHERE : indices des lignes qui passent le filtre
+        // 1. WHERE : scan parallèle → indices des lignes qui passent le filtre
         List<Integer> matchingRows = applyWhere(table, where);
 
-        List<Map<String, Object>> result;
+        QueryResult result;
 
         // 2. GROUP BY
         if (groupBy != null) {
             result = applyGroupBy(table, matchingRows, select, groupBy);
             if (orderBy != null) applyOrderBy(result, orderBy, orderAsc);
-            if (limit >= 0 && result.size() > limit) result = result.subList(0, limit);
+            if (limit >= 0 && result.totalRows() > limit) result = result.truncate(limit);
+
+        // 3. TOP-N : ORDER BY + LIMIT sans GROUP BY → min-heap O(n log k)
         } else if (orderBy != null && limit >= 0) {
-            // Top-N : min-heap sur les indices — O(n log k) sans matérialiser toutes les lignes
             result = applyTopN(table, matchingRows, select, orderBy, orderAsc, limit);
+
+        // 4. SELECT simple
         } else {
-            // SELECT simple : tronquer avant matérialisation si pas de tri
             List<Integer> rowsToMaterialize = (limit >= 0 && matchingRows.size() > limit)
                     ? matchingRows.subList(0, limit)
                     : matchingRows;
@@ -60,7 +104,10 @@ public class QueryEngine {
         return result;
     }
 
+    // -------------------------------------------------------------------------
     // WHERE — scan parallèle sur les indices de lignes
+    // -------------------------------------------------------------------------
+
     private List<Integer> applyWhere(Table table, WhereClause where) {
         int total = table.rowCount();
 
@@ -80,34 +127,22 @@ public class QueryEngine {
         if (cellValue == null) return false;
 
         switch (operator.toUpperCase()) {
-            case "=":
-            case "==":
-                // Comparaison directe pour les types numériques — évite toString()
+            case "=": case "==":
                 if (cellValue instanceof Number cn && filterValue instanceof Number fn)
                     return cn.doubleValue() == fn.doubleValue();
                 return cellValue.toString().equals(filterValue.toString());
-            case "!=":
-            case "<>":
+            case "!=": case "<>":
                 if (cellValue instanceof Number cn && filterValue instanceof Number fn)
                     return cn.doubleValue() != fn.doubleValue();
                 return !cellValue.toString().equals(filterValue.toString());
             case "CONTAINS":
                 return cellValue.toString().contains(filterValue.toString());
             default:
-                // Extraction numérique sans toString() quand la valeur est déjà typée
                 double cell, filter;
-                if (cellValue instanceof Number cn) {
-                    cell = cn.doubleValue();
-                } else {
-                    try { cell = Double.parseDouble(cellValue.toString()); }
-                    catch (NumberFormatException e) { return false; }
-                }
-                if (filterValue instanceof Number fn) {
-                    filter = fn.doubleValue();
-                } else {
-                    try { filter = Double.parseDouble(filterValue.toString()); }
-                    catch (NumberFormatException e) { return false; }
-                }
+                if (cellValue instanceof Number cn) cell = cn.doubleValue();
+                else { try { cell = Double.parseDouble(cellValue.toString()); } catch (NumberFormatException e) { return false; } }
+                if (filterValue instanceof Number fn) filter = fn.doubleValue();
+                else { try { filter = Double.parseDouble(filterValue.toString()); } catch (NumberFormatException e) { return false; } }
                 return switch (operator) {
                     case "<"  -> cell < filter;
                     case ">"  -> cell > filter;
@@ -118,20 +153,38 @@ public class QueryEngine {
         }
     }
 
-    // Top-N via min-heap sur indices — évite de matérialiser toutes les lignes
-    private List<Map<String, Object>> applyTopN(
+    // -------------------------------------------------------------------------
+    // SELECT colonnaire — zéro Map par ligne
+    // -------------------------------------------------------------------------
+
+    private QueryResult applySelect(Table table, List<Integer> rows, List<String> select) {
+        List<Column> cols = resolveColumns(table, select);
+        List<String> names = cols.stream().map(Column::getName).collect(Collectors.toList());
+
+        Map<String, List<Object>> data = new LinkedHashMap<>();
+        for (Column c : cols) data.put(c.getName(), new ArrayList<>(rows.size()));
+
+        for (int rowIdx : rows) {
+            for (Column c : cols) {
+                data.get(c.getName()).add(c.get(rowIdx));
+            }
+        }
+        return new QueryResult(names, data, rows.size());
+    }
+
+    // -------------------------------------------------------------------------
+    // TOP-N — min-heap O(n log k), zéro tri complet
+    // -------------------------------------------------------------------------
+
+    private QueryResult applyTopN(
             Table table, List<Integer> rows, List<String> select,
             String orderBy, boolean orderAsc, int limit) {
 
         Column sortCol = table.getColumn(orderBy);
 
-        // Min-heap (taille k) : garde les k plus grands (DESC) ou k plus petits (ASC)
-        // Pour DESC : on veut les k plus grands → heap sur le minimum → pop quand plus petit que le sommet
         PriorityQueue<Integer> heap = new PriorityQueue<>(limit + 1, (a, b) -> {
             double va = toDouble(sortCol.get(a));
             double vb = toDouble(sortCol.get(b));
-            // Pour DESC on veut éjecter les petits → comparaison normale (min en tête)
-            // Pour ASC on veut éjecter les grands → comparaison inversée (max en tête)
             return orderAsc ? Double.compare(vb, va) : Double.compare(va, vb);
         });
 
@@ -140,7 +193,6 @@ public class QueryEngine {
             if (heap.size() > limit) heap.poll();
         }
 
-        // Récupérer et trier dans le bon ordre
         List<Integer> topIndices = new ArrayList<>(heap);
         topIndices.sort((a, b) -> {
             double va = toDouble(sortCol.get(a));
@@ -151,36 +203,15 @@ public class QueryEngine {
         return applySelect(table, topIndices, select);
     }
 
-    private double toDouble(Object v) {
-        if (v instanceof Number n) return n.doubleValue();
-        if (v == null) return 0.0;
-        try { return Double.parseDouble(v.toString()); } catch (NumberFormatException e) { return 0.0; }
-    }
+    // -------------------------------------------------------------------------
+    // GROUP BY + accumulateurs primitifs double[] — zéro boxing
+    // -------------------------------------------------------------------------
 
-    // SELECT (projection)
-    private List<Map<String, Object>> applySelect(
-            Table table, List<Integer> rows, List<String> select) {
-
-        List<Column> cols = resolveColumns(table, select);
-
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (int rowIdx : rows) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            for (Column c : cols) {
-                row.put(c.getName(), c.get(rowIdx));
-            }
-            result.add(row);
-        }
-        return result;
-    }
-
-    // GROUP BY avec agrégations (COUNT, SUM, AVG, MIN, MAX)
-    private List<Map<String, Object>> applyGroupBy(
+    private QueryResult applyGroupBy(
             Table table, List<Integer> rows, List<String> select, String groupByCol) {
 
         Column groupCol = table.getColumn(groupByCol);
 
-        // Résoudre les agrégations demandées une seule fois
         record AggSpec(String sel, String agg, Column col) {}
         List<AggSpec> aggSpecs = new ArrayList<>();
         if (select != null) {
@@ -195,32 +226,24 @@ public class QueryEngine {
             }
         }
 
-        // Accumulateurs par groupe — pas de List<Double>, on accumule directement
-        record Acc(long count, double sum, double min, double max) {
-            Acc() { this(0, 0.0, Double.MAX_VALUE, -Double.MAX_VALUE); }
-            Acc add(double v) { return new Acc(count + 1, sum + v, Math.min(min, v), Math.max(max, v)); }
-        }
-
-        // Une Map<groupKey, Acc[]> — un Acc par agrégation
+        int nAgg = aggSpecs.size();
         Map<Object, long[]>   counts = new LinkedHashMap<>();
         Map<Object, double[]> sums   = new LinkedHashMap<>();
         Map<Object, double[]> mins   = new LinkedHashMap<>();
         Map<Object, double[]> maxs   = new LinkedHashMap<>();
 
-        int nAgg = aggSpecs.size();
-
         for (int rowIdx : rows) {
             Object key = groupCol.get(rowIdx);
             counts.computeIfAbsent(key, k -> new long[1])[0]++;
             if (nAgg > 0) {
-                double[] s = sums.computeIfAbsent(key, k -> new double[nAgg]);
-                double[] mn = mins.computeIfAbsent(key, k -> { double[] a = new double[nAgg]; Arrays.fill(a, Double.MAX_VALUE); return a; });
+                double[] s  = sums.computeIfAbsent(key, k -> new double[nAgg]);
+                double[] mn = mins.computeIfAbsent(key, k -> { double[] a = new double[nAgg]; Arrays.fill(a, Double.MAX_VALUE);  return a; });
                 double[] mx = maxs.computeIfAbsent(key, k -> { double[] a = new double[nAgg]; Arrays.fill(a, -Double.MAX_VALUE); return a; });
                 for (int i = 0; i < nAgg; i++) {
                     Object v = aggSpecs.get(i).col().get(rowIdx);
                     if (v instanceof Number n) {
                         double d = n.doubleValue();
-                        s[i] += d;
+                        s[i]  += d;
                         if (d < mn[i]) mn[i] = d;
                         if (d > mx[i]) mx[i] = d;
                     }
@@ -228,12 +251,20 @@ public class QueryEngine {
             }
         }
 
-        List<Map<String, Object>> result = new ArrayList<>();
+        // Construire résultat colonnaire
+        List<String> names = new ArrayList<>();
+        names.add(groupByCol);
+        names.add("count");
+        for (AggSpec spec : aggSpecs) names.add(spec.sel());
+
+        int nGroups = counts.size();
+        Map<String, List<Object>> data = new LinkedHashMap<>();
+        for (String name : names) data.put(name, new ArrayList<>(nGroups));
+
         for (Object key : counts.keySet()) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put(groupByCol, key);
             long cnt = counts.get(key)[0];
-            row.put("count", cnt);
+            data.get(groupByCol).add(key);
+            data.get("count").add(cnt);
             for (int i = 0; i < nAgg; i++) {
                 AggSpec spec = aggSpecs.get(i);
                 double[] s  = sums.getOrDefault(key, new double[nAgg]);
@@ -246,36 +277,49 @@ public class QueryEngine {
                     case "MAX" -> mx[i];
                     default    -> null;
                 };
-                row.put(spec.sel(), val);
+                data.get(spec.sel()).add(val);
             }
-            result.add(row);
         }
-        return result;
+
+        return new QueryResult(names, data, nGroups);
     }
 
-    // ORDER BY
-    @SuppressWarnings("unchecked")
-    private void applyOrderBy(List<Map<String, Object>> rows, String col, boolean asc) {
-        rows.sort((a, b) -> {
-            Object va = a.get(col);
-            Object vb = b.get(col);
-            if (va == null && vb == null) return 0;
-            if (va == null) return asc ? -1 : 1;
-            if (vb == null) return asc ? 1 : -1;
-            int cmp;
-            try {
-                double da = Double.parseDouble(va.toString());
-                double db = Double.parseDouble(vb.toString());
-                cmp = Double.compare(da, db);
-            } catch (NumberFormatException e) {
-                cmp = va.toString().compareTo(vb.toString());
-            }
-            return asc ? cmp : -cmp;
+    // -------------------------------------------------------------------------
+    // ORDER BY sur résultat colonnaire — permutation d'indices
+    // -------------------------------------------------------------------------
+
+    private void applyOrderBy(QueryResult result, String col, boolean asc) {
+        List<Object> sortCol = result.data().get(col);
+        if (sortCol == null) return;
+        int n = sortCol.size();
+
+        Integer[] indices = IntStream.range(0, n).boxed().toArray(Integer[]::new);
+        Arrays.sort(indices, (a, b) -> {
+            double va = toDouble(sortCol.get(a));
+            double vb = toDouble(sortCol.get(b));
+            return asc ? Double.compare(va, vb) : Double.compare(vb, va);
         });
+
+        for (String colName : result.columns()) {
+            List<Object> old    = result.data().get(colName);
+            List<Object> sorted = new ArrayList<>(n);
+            for (int idx : indices) sorted.add(old.get(idx));
+            result.data().put(colName, sorted);
+        }
     }
 
-    // ---------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // COUNT — scan parallèle sans matérialiser de résultats
+    // -------------------------------------------------------------------------
+
+    public long count(Table table, WhereClause where) {
+        return applyWhere(table, where).size();
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
+    // -------------------------------------------------------------------------
+
     private List<Column> resolveColumns(Table table, List<String> select) {
         if (select == null || select.isEmpty()) return table.getColumnsInternal();
         List<Column> cols = new ArrayList<>();
@@ -283,12 +327,16 @@ public class QueryEngine {
         return cols;
     }
 
-    /** Compte les lignes qui passent le filtre sans matérialiser de Maps — O(n) parallèle */
-    public long count(Table table, WhereClause where) {
-        return applyWhere(table, where).size();
+    private double toDouble(Object v) {
+        if (v instanceof Number n) return n.doubleValue();
+        if (v == null) return 0.0;
+        try { return Double.parseDouble(v.toString()); } catch (NumberFormatException e) { return 0.0; }
     }
 
-    // WhereClause — structure de filtre
+    // -------------------------------------------------------------------------
+    // WhereClause
+    // -------------------------------------------------------------------------
+
     public static class WhereClause {
         public String column;
         public String operator;

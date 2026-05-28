@@ -280,18 +280,18 @@ public class BenchmarkTaxiResource {
             boolean orderAsc, int limit) {
 
         long t0 = System.currentTimeMillis();
-        List<Map<String, Object>> rows = tm.query(
+        QueryEngine.QueryResult result = tm.query(
             tableName, select, where, groupBy, orderBy, orderAsc, limit);
         long dureeMs = System.currentTimeMillis() - t0;
 
-        List<Map<String, Object>> apercu = rows.size() > 5 ? rows.subList(0, 5) : rows;
-        return new RequeteResult(titre, description, dureeMs, rows.size(), apercu);
+        return new RequeteResult(titre, description, dureeMs,
+                result.totalRows(), result.toRows(5));
     }
 
     /**
      * Mesure spécialisée WHERE :
-     * - nbResultats = vrai compte (via count() parallèle, sans créer de Maps)
-     * - apercu = 5 lignes seulement
+     * - nbResultats = vrai compte (via count() parallèle, sans matérialisation)
+     * - apercu = 5 lignes via QueryResult.toRows()
      * - timing = temps du scan complet
      */
     private RequeteResult mesurerWhere(
@@ -305,7 +305,7 @@ public class BenchmarkTaxiResource {
         long dureeMs = System.currentTimeMillis() - t0;
 
         List<Map<String, Object>> apercu = tm.query(
-            tableName, selectApercu, where, null, null, false, 5);
+            tableName, selectApercu, where, null, null, false, 5).toRows(5);
 
         return new RequeteResult(titre, description, dureeMs, (int) nbTotal, apercu);
     }

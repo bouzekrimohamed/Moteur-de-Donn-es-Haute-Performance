@@ -23,16 +23,22 @@ public class QueryResource {
      *
      * Corps JSON attendu :
      * {
-     *   "select":  ["col1", "col2"],          // optionnel, null = toutes les colonnes
-     *   "where":   {                           // optionnel
-     *     "column": "age",
-     *     "operator": ">",
-     *     "value": 18
-     *   },
-     *   "groupBy":  "ville",                   // optionnel
-     *   "orderBy":  "age",                     // optionnel
-     *   "orderAsc": true,                      // optionnel, défaut = true
-     *   "limit":    100                        // optionnel, -1 = pas de limite
+     *   "select":  ["col1", "SUM(col2)"],   // optionnel, null = toutes les colonnes
+     *   "where":   { "column": "age", "operator": ">", "value": 18 },  // optionnel
+     *   "groupBy":  "ville",                // optionnel
+     *   "orderBy":  "age",                  // optionnel
+     *   "orderAsc": true,                   // optionnel, défaut = true
+     *   "limit":    100                     // optionnel, -1 = pas de limite
+     * }
+     *
+     * Réponse colonnaire :
+     * {
+     *   "totalRows": 9,
+     *   "columns": {
+     *     "payment_type":      [1,        2,       3     ],
+     *     "count":             [4585922,  653524,  38490 ],
+     *     "SUM(total_amount)": [131910597,14624511,431164]
+     *   }
      * }
      */
     @POST
@@ -48,20 +54,13 @@ public class QueryResource {
                         req.where.value);
             }
 
-            boolean asc = req.orderAsc == null || req.orderAsc;
-            int limit   = req.limit == null ? -1 : req.limit;
+            boolean asc   = req.orderAsc == null || req.orderAsc;
+            int     limit = req.limit    == null ? -1 : req.limit;
 
-            List<Map<String, Object>> rows = tableManager.query(
-                    tableName,
-                    req.select,
-                    where,
-                    req.groupBy,
-                    req.orderBy,
-                    asc,
-                    limit);
+            QueryEngine.QueryResult result = tableManager.query(
+                    tableName, req.select, where, req.groupBy, req.orderBy, asc, limit);
 
-            QueryResponse response = new QueryResponse(rows.size(), rows);
-            return Response.ok(response).build();
+            return Response.ok(new QueryResponse(result.totalRows(), result.data())).build();
 
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -74,8 +73,8 @@ public class QueryResource {
     public static class QueryRequest {
         public List<String> select;
         public WhereRequest where;
-        public String groupBy;
-        public String orderBy;
+        public String  groupBy;
+        public String  orderBy;
         public Boolean orderAsc;
         public Integer limit;
     }
@@ -88,7 +87,11 @@ public class QueryResource {
 
     public static class QueryResponse {
         public int totalRows;
-        public List<Map<String, Object>> rows;
-        public QueryResponse(int t, List<Map<String, Object>> r) { totalRows=t; rows=r; }
+        public Map<String, List<Object>> columns;
+
+        public QueryResponse(int totalRows, Map<String, List<Object>> columns) {
+            this.totalRows = totalRows;
+            this.columns   = columns;
+        }
     }
 }
