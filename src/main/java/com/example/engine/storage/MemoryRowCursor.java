@@ -6,18 +6,28 @@ import java.util.Map;
 public class MemoryRowCursor implements RowCursor {
 
     private final List<Column> columns;
-    private final int rowCount;
+    private final int endRow;   // exclusif
 
-    private int currentRow = 0;
+    private int currentRow;
 
+    /** Parcourt toutes les lignes (0 à rowCount). */
     public MemoryRowCursor(List<Column> columns, int rowCount) {
-        this.columns = columns;
-        this.rowCount = rowCount;
+        this(columns, 0, rowCount);
+    }
+
+    /**
+     * Parcourt la tranche [startRow, endRow) — permet d'assigner
+     * une portion de la mémoire à un thread différent.
+     */
+    public MemoryRowCursor(List<Column> columns, int startRow, int endRow) {
+        this.columns    = columns;
+        this.currentRow = startRow;
+        this.endRow     = endRow;
     }
 
     @Override
     public boolean hasNext() {
-        return currentRow < rowCount;
+        return currentRow < endRow;
     }
 
     @Override

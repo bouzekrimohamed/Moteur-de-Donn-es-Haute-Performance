@@ -7,6 +7,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -60,7 +61,20 @@ public class QueryResource {
                     asc,
                     limit);
 
-            QueryResponse response = new QueryResponse(rows.size(), rows);
+            // Colonnes extraites de la première ligne (ordre garanti par LinkedHashMap).
+            List<String> columns = rows.isEmpty()
+                    ? List.of()
+                    : new ArrayList<>(rows.get(0).keySet());
+
+            // Chaque ligne devient une simple liste de valeurs, sans répéter les noms.
+            List<List<Object>> data = new ArrayList<>(rows.size());
+            for (Map<String, Object> row : rows) {
+                List<Object> values = new ArrayList<>(columns.size());
+                for (String col : columns) values.add(row.get(col));
+                data.add(values);
+            }
+
+            QueryResponse response = new QueryResponse(rows.size(), columns, data);
             return Response.ok(response).build();
 
         } catch (IllegalArgumentException ex) {
@@ -88,7 +102,10 @@ public class QueryResource {
 
     public static class QueryResponse {
         public int totalRows;
-        public List<Map<String, Object>> rows;
-        public QueryResponse(int t, List<Map<String, Object>> r) { totalRows=t; rows=r; }
+        public List<String> columns;
+        public List<List<Object>> rows;
+        public QueryResponse(int t, List<String> c, List<List<Object>> r) {
+            totalRows = t; columns = c; rows = r;
+        }
     }
 }

@@ -15,6 +15,23 @@ public class Table {
     public static final int DEFAULT_MAX_ROWS_IN_MEMORY = 2_000_000;
 
     /**
+     * Intervalle de reset de l'ObjectOutputStream pendant le spill.
+     *
+     * <p>{@link java.io.ObjectOutputStream} maintient une table interne de tous
+     * les objets sérialisés pour pouvoir écrire des back-références (éviter les
+     * doublons). Sans reset, cette table grossit jusqu'à couvrir la totalité du
+     * segment (ex. 2M lignes × 6 colonnes = 12M entrées), et l'
+     * {@link java.io.ObjectInputStream} côté lecture doit faire de même.
+     * Sur de grands segments lus en parallèle, cela provoque un OOM.
+     *
+     * <p>Un appel à {@code out.reset()} écrit un token {@code TC_RESET} dans le
+     * flux ; l'ObjectInputStream le lit et vide sa propre table. La table est
+     * ainsi bornée à {@code SPILL_RESET_INTERVAL × nb_colonnes} entrées, quelle
+     * que soit la taille du segment.
+     */
+    public static final int SPILL_RESET_INTERVAL = 1_000;
+
+    /**
      * Rendu non statique + modifiable pour pouvoir l'abaisser dans les tests
      * (impossible de tester un spill avec 2 millions de lignes en CI).
      */
@@ -176,6 +193,13 @@ public class Table {
                 for (int row = 0; row < rows; row++) {
                     for (Column column : columns) {
                         out.writeObject(column.get(row));
+                    }
+                    // Reset périodique : vide la table de handles interne de l'OOS.
+                    // L'OIS lira le token TC_RESET et videra la sienne en miroir,
+                    // bornant la consommation mémoire à SPILL_RESET_INTERVAL × nb_colonnes
+                    // objets au lieu de toute la taille du segment.
+                    if ((row + 1) % SPILL_RESET_INTERVAL == 0) {
+                        out.reset();
                     }
                 }
             }

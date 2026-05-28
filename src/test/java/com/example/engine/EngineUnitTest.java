@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -598,6 +599,42 @@ class EngineUnitTest {
             assertEquals(7000, result.get(0).get("salaire"));
         }
 
+        @Test
+        @DisplayName("ORDER BY DESC + LIMIT : heap borné retourne les K plus grandes valeurs (ordre correct)")
+        void orderByDescWithLimitBoundedHeap() {
+            // Table de 5 employés, on demande les 3 mieux payés en DESC.
+            List<Map<String, Object>> result = engine.query(
+                    table, List.of("nom", "salaire"), null, null, "salaire", false, 3);
+
+            assertEquals(3, result.size());
+            // Premier = plus haut salaire
+            assertEquals(7000, result.get(0).get("salaire")); // Charlie
+            assertEquals(6000, result.get(1).get("salaire")); // Eve
+            assertEquals(5000, result.get(2).get("salaire")); // Alice
+        }
+
+        @Test
+        @DisplayName("ORDER BY ASC + LIMIT : heap borné retourne les K plus petites valeurs (ordre correct)")
+        void orderByAscWithLimitBoundedHeap() {
+            List<Map<String, Object>> result = engine.query(
+                    table, List.of("nom", "salaire"), null, null, "salaire", true, 2);
+
+            assertEquals(2, result.size());
+            assertEquals(3000, result.get(0).get("salaire")); // Bob
+            assertEquals(4000, result.get(1).get("salaire")); // Diana
+        }
+
+        @Test
+        @DisplayName("ORDER BY DESC + LIMIT >= taille table : retourne toutes les lignes triées")
+        void orderByDescLimitLargerThanTable() {
+            List<Map<String, Object>> result = engine.query(
+                    table, List.of("nom", "salaire"), null, null, "salaire", false, 100);
+
+            assertEquals(5, result.size());
+            assertEquals(7000, result.get(0).get("salaire"));
+            assertEquals(3000, result.get(4).get("salaire"));
+        }
+
         // --- TableManager.query intégration ---
 
         @Test
@@ -618,6 +655,248 @@ class EngineUnitTest {
 
             assertEquals(1, result.size());
             assertEquals("Alice", result.get(0).get("nom"));
+        }
+    }
+
+    // =========================================================================
+    // DiskRowCursor — lecture correcte après reset intermédiaire
+    // =========================================================================
+    @Nested
+    @DisplayName("DiskRowCursor — intégrité des données après TC_RESET")
+    class DiskResetTests {
+
+        /**
+         * Vérifie que les données qui traversent un point de reset (écriture en
+         * plusieurs blocs de SPILL_RESET_INTERVAL lignes) sont lues correctement.
+         *
+         * On abaisse le seuil de spill à 3 × SPILL_RESET_INTERVAL lignes pour
+         * forcer plusieurs resets dans un seul segment, puis on s'assure que :
+         *   - le nombre de lignes relues est exact,
+         *   - les valeurs situées juste après un reset sont correctes,
+         *   - les valeurs situées juste avant un reset sont correctes.
+         */
+        @Test
+        @DisplayName("Spill avec reset intermédiaire : toutes les lignes sont relues correctement")
+        void spillWithIntermediateReset() {
+            // On veut dépasser SPILL_RESET_INTERVAL pour déclencher au moins 1 reset.
+            int totalRows = Table.SPILL_RESET_INTERVAL * 3; // ex. 3 000 lignes
+
+            Table t = new Table("reset_test");
+            t.setMaxRowsInMemory(totalRows); // tout en mémoire d'abord
+            t.addColumn("id",    "INT");
+            t.addColumn("label", "STRING");
+
+            for (int i = 0; i < totalRows; i++) {
+                t.addToColumn("id",    i);
+                t.addToColumn("label", "row-" + i);
+            }
+
+            // Forcer le spill manuellement en abaissant le seuil, puis relire
+            t.setMaxRowsInMemory(1); // déclenche le spill au prochain accès interne
+            // On recrée la table directement avec le seuil bas pour avoir le spill
+            Table t2 = new Table("reset_test2");
+            t2.setMaxRowsInMemory(totalRows + 1); // tout en RAM — pas de spill
+            t2.addColumn("id",    "INT");
+            t2.addColumn("label", "STRING");
+            for (int i = 0; i < totalRows; i++) {
+                t2.addToColumn("id",    i);
+                t2.addToColumn("label", "row-" + i);
+            }
+            // Forcer un spill en réduisant le seuil et en ajoutant une ligne
+            t2.setMaxRowsInMemory(totalRows); // seuil = totalRows → déjà atteint
+            t2.addToColumn("id",    totalRows);  // cette insertion déclenche le spill
+            t2.addToColumn("label", "row-" + totalRows);
+
+            // Le segment disque contient totalRows lignes avec au moins 2 resets.
+            assertTrue(t2.getDiskSegments().size() >= 1,
+                    "Au moins un segment disque doit exister");
+
+            // Lecture complète via query
+            List<Map<String, Object>> rows = new QueryEngine().query(
+                    t2, List.of("id", "label"), null, null, "id", true, -1);
+
+            // Nombre total = totalRows + 1 (celle encore en RAM)
+            assertEquals(totalRows + 1, rows.size());
+
+            // Lignes juste avant un reset (SPILL_RESET_INTERVAL - 1)
+            int beforeReset = Table.SPILL_RESET_INTERVAL - 1;
+            assertEquals(beforeReset, rows.get(beforeReset).get("id"));
+            assertEquals("row-" + beforeReset, rows.get(beforeReset).get("label"));
+
+            // Lignes juste après un reset (SPILL_RESET_INTERVAL)
+            assertEquals(Table.SPILL_RESET_INTERVAL, rows.get(Table.SPILL_RESET_INTERVAL).get("id"));
+            assertEquals("row-" + Table.SPILL_RESET_INTERVAL,
+                    rows.get(Table.SPILL_RESET_INTERVAL).get("label"));
+
+            // Dernière ligne du segment (2 × SPILL_RESET_INTERVAL - 1)
+            int lastInSeg = totalRows - 1;
+            assertEquals(lastInSeg, rows.get(lastInSeg).get("id"));
+            assertEquals("row-" + lastInSeg, rows.get(lastInSeg).get("label"));
+        }
+    }
+
+    // =========================================================================
+    // Parallélisme — table multi-segments
+    // =========================================================================
+    @Nested
+    @DisplayName("Parallélisme — table multi-segments (spill forcé)")
+    class ParallelQueryTests {
+
+        /**
+         * Table "scores" avec seuil de spill = 3 lignes :
+         * on insère 9 lignes → 3 segments disque de 3 lignes chacun + 0 en RAM.
+         *
+         *  | joueur  | score |
+         *  | Alice   |  10   |
+         *  | Bob     |  50   |
+         *  | Charlie |  30   |
+         *  | Diana   |  80   |
+         *  | Eve     |  20   |
+         *  | Frank   |  60   |
+         *  | Grace   |  90   |
+         *  | Hank    |  40   |
+         *  | Iris    |  70   |
+         */
+        private Table buildMultiSegmentTable() {
+            Table t = new Table("scores");
+            t.setMaxRowsInMemory(3); // spill tous les 3 lignes
+            t.addColumn("joueur", "STRING");
+            t.addColumn("score",  "INT");
+
+            for (Object[] row : new Object[][]{
+                    {"Alice",   10}, {"Bob",   50}, {"Charlie", 30},
+                    {"Diana",   80}, {"Eve",   20}, {"Frank",   60},
+                    {"Grace",   90}, {"Hank",  40}, {"Iris",    70},
+            }) {
+                t.addToColumn("joueur", row[0]);
+                t.addToColumn("score",  row[1]);
+            }
+            return t;
+        }
+
+        @Test
+        @DisplayName("SELECT * parallèle : toutes les lignes sont présentes")
+        void parallelSelectAll() {
+            Table t = buildMultiSegmentTable();
+            assertEquals(3, t.getDiskSegments().size()); // spill bien déclenché
+
+            List<Map<String, Object>> result = new QueryEngine().query(
+                    t, null, null, null, null, true, -1);
+
+            assertEquals(9, result.size());
+        }
+
+        @Test
+        @DisplayName("SELECT parallèle + WHERE : résultat identique au séquentiel")
+        void parallelSelectWithWhere() {
+            Table t = buildMultiSegmentTable();
+            var where = new QueryEngine.WhereClause("score", ">", 50);
+
+            List<Map<String, Object>> resultParallel = new QueryEngine().query(
+                    t, List.of("joueur", "score"), where, null, null, true, -1);
+
+            // Référence séquentielle : même table, seuil élevé → 1 seul segment RAM
+            Table tSeq = new Table("scores_seq");
+            tSeq.addColumn("joueur", "STRING");
+            tSeq.addColumn("score",  "INT");
+            for (Object[] row : new Object[][]{
+                    {"Alice",10},{"Bob",50},{"Charlie",30},
+                    {"Diana",80},{"Eve",20},{"Frank",60},
+                    {"Grace",90},{"Hank",40},{"Iris",70}}) {
+                tSeq.addToColumn("joueur", row[0]);
+                tSeq.addToColumn("score",  row[1]);
+            }
+            List<Map<String, Object>> resultSeq = new QueryEngine().query(
+                    tSeq, List.of("joueur", "score"), where, null, null, true, -1);
+
+            // Même taille, mêmes joueurs (indépendamment de l'ordre)
+            assertEquals(resultSeq.size(), resultParallel.size());
+            Set<Object> joueursParallel = new java.util.HashSet<>();
+            resultParallel.forEach(r -> joueursParallel.add(r.get("joueur")));
+            Set<Object> joueursSeq = new java.util.HashSet<>();
+            resultSeq.forEach(r -> joueursSeq.add(r.get("joueur")));
+            assertEquals(joueursSeq, joueursParallel);
+        }
+
+        @Test
+        @DisplayName("ORDER BY DESC + LIMIT parallèle : top 3 corrects")
+        void parallelOrderByDescLimit() {
+            Table t = buildMultiSegmentTable();
+            List<Map<String, Object>> result = new QueryEngine().query(
+                    t, List.of("joueur", "score"), null, null, "score", false, 3);
+
+            assertEquals(3, result.size());
+            assertEquals(90, result.get(0).get("score")); // Grace
+            assertEquals(80, result.get(1).get("score")); // Diana
+            assertEquals(70, result.get(2).get("score")); // Iris
+        }
+
+        @Test
+        @DisplayName("ORDER BY ASC + LIMIT parallèle : bottom 2 corrects")
+        void parallelOrderByAscLimit() {
+            Table t = buildMultiSegmentTable();
+            List<Map<String, Object>> result = new QueryEngine().query(
+                    t, List.of("joueur", "score"), null, null, "score", true, 2);
+
+            assertEquals(2, result.size());
+            assertEquals(10, result.get(0).get("score")); // Alice
+            assertEquals(20, result.get(1).get("score")); // Eve
+        }
+
+        @Test
+        @DisplayName("GROUP BY parallèle : SUM identique au séquentiel")
+        void parallelGroupBySum() {
+            // Table avec deux catégories réparties sur plusieurs segments
+            Table t = new Table("ventes");
+            t.setMaxRowsInMemory(2);
+            t.addColumn("cat",    "STRING");
+            t.addColumn("montant","INT");
+
+            // Catégorie A : 10+30+50 = 90, Catégorie B : 20+40+60 = 120
+            for (Object[] row : new Object[][]{
+                    {"A",10},{"B",20},{"A",30},
+                    {"B",40},{"A",50},{"B",60}}) {
+                t.addToColumn("cat",     row[0]);
+                t.addToColumn("montant", row[1]);
+            }
+
+            List<Map<String, Object>> result = new QueryEngine().query(
+                    t, List.of("SUM(montant)"), null, "cat", null, true, -1);
+
+            Map<Object, Object> sumByCat = new java.util.HashMap<>();
+            result.forEach(r -> sumByCat.put(r.get("cat"), r.get("SUM(montant)")));
+
+            assertEquals(90.0,  sumByCat.get("A"));
+            assertEquals(120.0, sumByCat.get("B"));
+        }
+
+        @Test
+        @DisplayName("GROUP BY parallèle : MIN et MAX identiques au séquentiel")
+        void parallelGroupByMinMax() {
+            Table t = new Table("notes");
+            t.setMaxRowsInMemory(2);
+            t.addColumn("matiere", "STRING");
+            t.addColumn("note",    "INT");
+
+            // Math : min=5, max=20 ; Info : min=10, max=18
+            for (Object[] row : new Object[][]{
+                    {"Math",15},{"Info",10},{"Math",5},
+                    {"Info",18},{"Math",20},{"Info",12}}) {
+                t.addToColumn("matiere", row[0]);
+                t.addToColumn("note",    row[1]);
+            }
+
+            List<Map<String, Object>> result = new QueryEngine().query(
+                    t, List.of("MIN(note)", "MAX(note)"), null, "matiere", null, true, -1);
+
+            Map<Object, Map<String,Object>> byMat = new java.util.HashMap<>();
+            result.forEach(r -> byMat.put(r.get("matiere"),
+                    Map.of("min", r.get("MIN(note)"), "max", r.get("MAX(note)"))));
+
+            assertEquals(5.0,  byMat.get("Math").get("min"));
+            assertEquals(20.0, byMat.get("Math").get("max"));
+            assertEquals(10.0, byMat.get("Info").get("min"));
+            assertEquals(18.0, byMat.get("Info").get("max"));
         }
     }
 }
