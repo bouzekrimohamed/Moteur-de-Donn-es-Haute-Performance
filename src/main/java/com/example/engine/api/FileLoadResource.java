@@ -8,9 +8,12 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.io.File;
 import java.util.Map;
+
 
 /**
  * Endpoints pour charger des fichiers CSV ou Parquet dans une table existante.
@@ -113,6 +116,94 @@ public class FileLoadResource {
                     .entity(new TableResource.ErrorResponse("Erreur import Parquet : " + ex.getMessage()))
                     .build();
         }
+    }
+
+// -----------------------------------------------------------------------
+// Upload + chargement Parquet dans une table existante
+// -----------------------------------------------------------------------
+
+    @POST
+    @Path("/{tableName}/upload/parquet")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response uploadParquet(
+            @PathParam("tableName") String tableName,
+            @RestForm("file") FileUpload upload) {
+        try {
+            validateUploadExtension(upload.fileName(), ".parquet");
+            // FileUpload.uploadedFile() retourne un java.nio.file.Path temporaire
+            Table table = tableManager.getInternalTable(tableName);
+            int count = ParquetLoader.load(table, upload.uploadedFile().toString());
+            return Response.accepted(
+                            new FileLoadResponse("ACCEPTED", count, tableName, upload.fileName()))
+                    .build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new TableResource.ErrorResponse(ex.getMessage())).build();
+        } catch (Exception ex) {
+            return Response.serverError()
+                    .entity(new TableResource.ErrorResponse(
+                            "Erreur upload Parquet : " + ex.getMessage())).build();
+        }
+    }
+
+// -----------------------------------------------------------------------
+// Upload + import Parquet (création automatique de table)
+// -----------------------------------------------------------------------
+
+    @POST
+    @Path("/import/upload/parquet")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response importUploadParquet(@RestForm("file") FileUpload upload) {
+        try {
+            validateUploadExtension(upload.fileName(), ".parquet");
+            Table table = ParquetLoader.loadAsNewTable(upload.uploadedFile().toString());
+            tableManager.registerTable(table);
+            long count = table.totalRowCount();
+            return Response.status(Response.Status.CREATED)
+                    .entity(new FileLoadResponse("CREATED", count, table.getName(), upload.fileName()))
+                    .build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new TableResource.ErrorResponse(ex.getMessage())).build();
+        } catch (Exception ex) {
+            return Response.serverError()
+                    .entity(new TableResource.ErrorResponse(
+                            "Erreur import upload Parquet : " + ex.getMessage())).build();
+        }
+    }
+
+// -----------------------------------------------------------------------
+// Upload + chargement CSV dans une table existante
+// -----------------------------------------------------------------------
+
+    @POST
+    @Path("/{tableName}/upload/csv")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response uploadCsv(
+            @PathParam("tableName") String tableName,
+            @RestForm("file") FileUpload upload) {
+        try {
+            validateUploadExtension(upload.fileName(), ".csv");
+            Table table = tableManager.getInternalTable(tableName);
+            int count = CsvLoader.load(table, upload.uploadedFile().toString());
+            return Response.accepted(
+                            new FileLoadResponse("ACCEPTED", count, tableName, upload.fileName()))
+                    .build();
+        } catch (IllegalArgumentException ex) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new TableResource.ErrorResponse(ex.getMessage())).build();
+        } catch (Exception ex) {
+            return Response.serverError()
+                    .entity(new TableResource.ErrorResponse(
+                            "Erreur upload CSV : " + ex.getMessage())).build();
+        }
+    }
+
+    // Helper — vérifie l'extension du nom de fichier reçu
+    private void validateUploadExtension(String fileName, String expectedExt) {
+        if (fileName == null || !fileName.toLowerCase().endsWith(expectedExt))
+            throw new IllegalArgumentException(
+                    "Extension attendue : " + expectedExt + " — reçu : " + fileName);
     }
 
     // -----------------------------------------------------------------------
