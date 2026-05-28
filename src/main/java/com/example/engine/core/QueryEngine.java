@@ -283,6 +283,11 @@ public class QueryEngine {
         return cols;
     }
 
+    /** Compte les lignes qui passent le filtre sans matérialiser de Maps — O(n) parallèle */
+    public long count(Table table, WhereClause where) {
+        return applyWhere(table, where).size();
+    }
+
     // WhereClause — structure de filtre
     public static class WhereClause {
         public String column;

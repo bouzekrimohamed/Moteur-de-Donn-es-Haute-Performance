@@ -136,6 +136,11 @@ public class TableManager {
         return queryEngine.query(table, select, where, groupBy, orderBy, orderAsc, limit);
     }
 
+    /** Compte les lignes qui passent le filtre WHERE sans matérialiser les résultats */
+    public long count(String tableName, QueryEngine.WhereClause where) {
+        return queryEngine.count(getExistingTable(tableName), where);
+    }
+
     // Helpers internes
     private Table getExistingTable(String tableName) {
         if (tableName == null || tableName.isBlank())
