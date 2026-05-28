@@ -4,10 +4,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.io.*;
+import java.nio.file.*;
 
 public class Table {
     private final String name;
     private final List<Column> columns;
+    private static final int MAX_ROWS_IN_MEMORY = 2_000_000;
+    private final List<DiskSegment> diskSegments = new ArrayList<>();
 
     public Table(String name) {
         this.name = name;
@@ -29,7 +33,9 @@ public class Table {
     public boolean addToColumn(String columnName, Object value) {
         for (Column c : columns) {
             if (c.getName().equals(columnName)) {
-                return c.add(value);
+                boolean result = c.add(value);
+                checkSpillToDisk();
+                return result;
             }
         }
         return false;
@@ -76,6 +82,41 @@ public class Table {
             rows.add(row);
         }
         return rows;
+    }
+
+    private void spillToDisk() {
+        try {
+            Path tempFile = Files.createTempFile( "sgbd-" + name + "-", ".bin" );
+            tempFile.toFile().deleteOnExit();
+            try (ObjectOutputStream out = new ObjectOutputStream( new BufferedOutputStream( Files.newOutputStream(tempFile)))) {
+                int rows = rowCount();
+                out.writeInt(rows);
+                out.writeInt(columns.size());
+                for (Column column : columns) {
+                    out.writeUTF(column.getName());
+                    out.writeUTF(column.getType());
+                }
+                for (int row = 0; row < rows; row++) {
+                    for (Column column : columns) {
+                        out.writeObject(column.get(row));
+                    }
+                }
+            }
+            diskSegments.add( new DiskSegment(tempFile, rowCount()) );
+            clearMemoryData();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void clearMemoryData() { for (Column column : columns) { column.clear(); } }
+
+    public List<DiskSegment> getDiskSegments() { return diskSegments; }
+
+    private void checkSpillToDisk() {
+        if (rowCount() >= MAX_ROWS_IN_MEMORY) {
+            spillToDisk();
+        }
     }
 
     public String getName() { return name; }

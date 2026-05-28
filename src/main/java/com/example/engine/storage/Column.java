@@ -56,4 +56,6 @@ public class Column {
     public Column clone() {
         return new Column(name, type, data);
     }
+
+    public void clear() { data.clear(); }
 }
