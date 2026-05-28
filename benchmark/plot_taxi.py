@@ -399,7 +399,7 @@ def _sauver(fig, dossier, nom):
     chemin = os.path.join(dossier, nom)
     fig.savefig(chemin, dpi=150, bbox_inches="tight")
     print(f"[OK] {os.path.abspath(chemin)}")
-    plt.show()
+    plt.close(fig)   # ferme sans bloquer — toutes les figures generees d'un coup
 
 
 # ---------------------------------------------------------------------------
