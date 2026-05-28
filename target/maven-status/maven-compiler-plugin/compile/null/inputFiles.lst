@@ -6,4 +6,15 @@ C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com
 C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\loader\CsvLoader.java
 C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\loader\ParquetLoader.java
 C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\Column.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\CompositeRowCursor.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\DiskRowCursor.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\DiskSegment.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\MemoryRowCursor.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\Row.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\RowCursor.java
 C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\com\example\engine\storage\Table.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\data\Column.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\data\CsvLoader.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\data\Main.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\data\ParquetReader.java
+C:\Users\abel\IdeaProjects\Moteur-de-Donn-es-Haute-Performance\src\main\java\data\Table.java

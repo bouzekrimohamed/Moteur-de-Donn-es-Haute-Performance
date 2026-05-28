@@ -2,7 +2,9 @@ package com.example.engine.core;
 
 import com.example.engine.storage.Column;
 import com.example.engine.storage.Table;
+import io.quarkus.runtime.ShutdownEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -80,8 +82,19 @@ public class TableManager {
     // Suppression de table
     public void dropTable(String tableName) {
         Table table = getExistingTable(tableName);
+        table.cleanupDiskSegments(); // supprime les fichiers temporaires associés
         tablesByName.remove(table.getName());
         columnTypesByTable.remove(table.getName());
+    }
+
+    /**
+     * À l'arrêt du serveur, supprime tous les fichiers de segments restants.
+     * Complète le {@code deleteOnExit()} (plus fiable et immédiat).
+     */
+    void onShutdown(@Observes ShutdownEvent ev) {
+        for (Table table : tablesByName.values()) {
+            table.cleanupDiskSegments();
+        }
     }
 
     // Chargement de données

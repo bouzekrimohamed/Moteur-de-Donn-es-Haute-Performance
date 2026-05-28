@@ -58,13 +58,16 @@ public class CsvLoader {
                     continue;
                 }
 
-                // Insérer chaque valeur dans la bonne colonne
+                // Insérer chaque valeur dans la bonne colonne.
+                // On passe par table.addToColumn(...) (et non col.add) pour que
+                // le mécanisme de bascule sur disque se déclenche aussi lors du
+                // chargement d'un gros CSV.
                 for (int i = 0; i < headers.length; i++) {
                     String colName = headers[i];
                     String raw = fields[i].trim();
-                    Column col = table.getColumn(colName);
-                    Object value = parseValue(raw, col.getType());
-                    col.add(value);
+                    String colType = table.getColumn(colName).getType();
+                    Object value = parseValue(raw, colType);
+                    table.addToColumn(colName, value);
                 }
                 loaded++;
             }

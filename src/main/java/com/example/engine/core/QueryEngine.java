@@ -1,30 +1,24 @@
 package com.example.engine.core;
 
-import com.example.engine.storage.Column;
+import com.example.engine.storage.Row;
+import com.example.engine.storage.RowCursor;
 import com.example.engine.storage.Table;
 
 import java.util.*;
 
 /**
- * Moteur de requêtes en mémoire.
+ * Moteur de requêtes en STREAMING.
+ *
+ * Au lieu de lire les colonnes par index en mémoire, il parcourt la table via
+ * un {@link RowCursor} (RAM puis segments disque) ligne par ligne, en un seul
+ * passage. Les données "froides" stockées sur disque ne sont donc jamais
+ * entièrement rechargées en RAM.
+ *
  * Supporte : SELECT, WHERE (=, !=, <, >, <=, >=, CONTAINS), GROUP BY,
- *            fonctions d'agrégation (COUNT, SUM, AVG, MIN, MAX),
- *            ORDER BY, LIMIT.
+ *            agrégations (COUNT, SUM, AVG, MIN, MAX), ORDER BY, LIMIT.
  */
 public class QueryEngine {
 
-    /**
-     * Exécute une requête sur une table.
-     *
-     * @param table    la table source
-     * @param select   colonnes à retourner (null ou vide = toutes)
-     * @param where    filtre (null = pas de filtre)
-     * @param groupBy  colonne de regroupement (null = pas de group by)
-     * @param orderBy  colonne de tri (null = pas de tri)
-     * @param orderAsc true = ASC, false = DESC
-     * @param limit    nombre max de lignes (-1 = pas de limite)
-     * @return résultats sous forme de liste de maps
-     */
     public List<Map<String, Object>> query(
             Table table,
             List<String> select,
@@ -34,54 +28,115 @@ public class QueryEngine {
             boolean orderAsc,
             int limit) {
 
-        // 1. WHERE : indices des lignes qui passent le filtre
-        List<Integer> matchingRows = applyWhere(table, where);
+        // Validation du schéma AVANT de lire (messages d'erreur clairs).
+        validate(table, select, where, groupBy);
 
         List<Map<String, Object>> result;
-
-        // 2. GROUP BY
         if (groupBy != null) {
-            result = applyGroupBy(table, matchingRows, select, groupBy);
+            result = streamGroupBy(table, where, select, groupBy);
         } else {
-            // 3. SELECT simple
-            result = applySelect(table, matchingRows, select);
+            result = streamSelect(table, where, select, orderBy, limit);
         }
 
-        // 4. ORDER BY
+        // ORDER BY (sur le jeu de résultats, pas sur la source).
         if (orderBy != null) {
             applyOrderBy(result, orderBy, orderAsc);
         }
 
-        // 5. LIMIT
+        // LIMIT final (déjà appliqué en avance dans le SELECT sans ORDER BY).
         if (limit >= 0 && result.size() > limit) {
-            result = result.subList(0, limit);
+            result = new ArrayList<>(result.subList(0, limit));
         }
-
         return result;
     }
 
-    // WHERE
-    private List<Integer> applyWhere(Table table, WhereClause where) {
-        List<Integer> result = new ArrayList<>();
-        int total = table.rowCount();
+    // ---------------------------------------------------------------------
+    // SELECT (projection) en streaming
+    // ---------------------------------------------------------------------
+    private List<Map<String, Object>> streamSelect(
+            Table table, WhereClause where, List<String> select,
+            String orderBy, int limit) {
 
-        if (where == null) {
-            for (int i = 0; i < total; i++) result.add(i);
-            return result;
-        }
+        boolean selectAll = (select == null || select.isEmpty());
+        // Arrêt anticipé possible seulement sans ORDER BY (sinon il faut tout
+        // collecter avant de trier).
+        boolean canEarlyStop = (orderBy == null && limit >= 0);
 
-        Column col = table.getColumn(where.column);
-        for (int i = 0; i < total; i++) {
-            if (matches(col.get(i), where.operator, where.value)) {
-                result.add(i);
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        try (RowCursor cursor = table.openCursor()) {
+            while (cursor.hasNext()) {
+                Row row = cursor.next();
+                if (!passesWhere(row, where)) continue;
+
+                Map<String, Object> out;
+                if (selectAll) {
+                    out = new LinkedHashMap<>(row.values());
+                } else {
+                    out = new LinkedHashMap<>();
+                    for (String col : select) out.put(col, row.get(col));
+                }
+                result.add(out);
+
+                if (canEarlyStop && result.size() >= limit) break;
             }
         }
         return result;
     }
 
+    // ---------------------------------------------------------------------
+    // GROUP BY + agrégations en streaming
+    // ---------------------------------------------------------------------
+    private List<Map<String, Object>> streamGroupBy(
+            Table table, WhereClause where, List<String> select, String groupByCol) {
+
+        List<AggSpec> aggs = parseAggregations(select);
+
+        // valeur de regroupement -> accumulateur
+        Map<Object, GroupAcc> groups = new LinkedHashMap<>();
+
+        try (RowCursor cursor = table.openCursor()) {
+            while (cursor.hasNext()) {
+                Row row = cursor.next();
+                if (!passesWhere(row, where)) continue;
+
+                Object key = row.get(groupByCol);
+                GroupAcc acc = groups.computeIfAbsent(key, k -> new GroupAcc(aggs));
+                acc.count++;
+
+                for (AggSpec spec : aggs) {
+                    Object v = row.get(spec.column);
+                    if (v != null) {
+                        try { acc.update(spec, Double.parseDouble(v.toString())); }
+                        catch (NumberFormatException ignored) {}
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<Object, GroupAcc> e : groups.entrySet()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put(groupByCol, e.getKey());
+            row.put("count", e.getValue().count);
+            for (AggSpec spec : aggs) {
+                row.put(spec.raw, e.getValue().result(spec));
+            }
+            result.add(row);
+        }
+        return result;
+    }
+
+    // ---------------------------------------------------------------------
+    // WHERE (évaluation ligne par ligne)
+    // ---------------------------------------------------------------------
+    private boolean passesWhere(Row row, WhereClause where) {
+        if (where == null) return true;
+        return matches(row.get(where.column), where.operator, where.value);
+    }
+
     private boolean matches(Object cellValue, String operator, Object filterValue) {
         if (cellValue == null) return false;
-
         switch (operator.toUpperCase()) {
             case "=":
             case "==":
@@ -108,82 +163,9 @@ public class QueryEngine {
         }
     }
 
-    // SELECT (projection)
-    private List<Map<String, Object>> applySelect(
-            Table table, List<Integer> rows, List<String> select) {
-
-        List<Column> cols = resolveColumns(table, select);
-
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (int rowIdx : rows) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            for (Column c : cols) {
-                row.put(c.getName(), c.get(rowIdx));
-            }
-            result.add(row);
-        }
-        return result;
-    }
-
-    // GROUP BY avec agrégations (COUNT, SUM, AVG, MIN, MAX)
-    private List<Map<String, Object>> applyGroupBy(
-            Table table, List<Integer> rows, List<String> select, String groupByCol) {
-
-        Column groupCol = table.getColumn(groupByCol);
-
-        // Regroupement : valeur → indices
-        Map<Object, List<Integer>> groups = new LinkedHashMap<>();
-        for (int rowIdx : rows) {
-            Object key = groupCol.get(rowIdx);
-            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(rowIdx);
-        }
-
-        // Construire le résultat
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<Object, List<Integer>> entry : groups.entrySet()) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put(groupByCol, entry.getKey());
-            row.put("count", entry.getValue().size());
-
-            // Agrégations supplémentaires si demandées
-            if (select != null) {
-                for (String sel : select) {
-                    String upper = sel.toUpperCase();
-                    for (String agg : List.of("SUM", "AVG", "MIN", "MAX")) {
-                        if (upper.startsWith(agg + "(") && upper.endsWith(")")) {
-                            String colName = sel.substring(agg.length() + 1, sel.length() - 1).trim();
-                            Column aggCol = table.getColumn(colName);
-                            List<Double> values = new ArrayList<>();
-                            for (int idx : entry.getValue()) {
-                                Object v = aggCol.get(idx);
-                                if (v != null) {
-                                    try { values.add(Double.parseDouble(v.toString())); }
-                                    catch (NumberFormatException ignored) {}
-                                }
-                            }
-                            row.put(sel, computeAgg(agg, values));
-                        }
-                    }
-                }
-            }
-            result.add(row);
-        }
-        return result;
-    }
-
-    private Object computeAgg(String agg, List<Double> values) {
-        if (values.isEmpty()) return null;
-        return switch (agg) {
-            case "SUM" -> values.stream().mapToDouble(Double::doubleValue).sum();
-            case "AVG" -> values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
-            case "MIN" -> values.stream().mapToDouble(Double::doubleValue).min().orElse(0);
-            case "MAX" -> values.stream().mapToDouble(Double::doubleValue).max().orElse(0);
-            default    -> null;
-        };
-    }
-
-    // ORDER BY
-    @SuppressWarnings("unchecked")
+    // ---------------------------------------------------------------------
+    // ORDER BY (tri du jeu de résultats déjà matérialisé)
+    // ---------------------------------------------------------------------
     private void applyOrderBy(List<Map<String, Object>> rows, String col, boolean asc) {
         rows.sort((a, b) -> {
             Object va = a.get(col);
@@ -204,15 +186,102 @@ public class QueryEngine {
     }
 
     // ---------------------------------------------------------------------
-    // Helpers
-    private List<Column> resolveColumns(Table table, List<String> select) {
-        if (select == null || select.isEmpty()) return table.getColumnsInternal();
-        List<Column> cols = new ArrayList<>();
-        for (String s : select) cols.add(table.getColumn(s));
-        return cols;
+    // Validation du schéma
+    // ---------------------------------------------------------------------
+    private void validate(Table table, List<String> select, WhereClause where, String groupBy) {
+        if (where != null && !table.hasColumn(where.column))
+            throw new IllegalArgumentException("Colonne inconnue : " + where.column);
+        if (groupBy != null && !table.hasColumn(groupBy))
+            throw new IllegalArgumentException("Colonne inconnue : " + groupBy);
+
+        if (select != null) {
+            for (String sel : select) {
+                AggSpec spec = AggSpec.tryParse(sel);
+                if (spec != null) {
+                    if (!table.hasColumn(spec.column))
+                        throw new IllegalArgumentException("Colonne inconnue : " + spec.column);
+                } else if (groupBy == null && !table.hasColumn(sel)) {
+                    // En mode GROUP BY, un nom simple non agrégé est ignoré
+                    // (comportement historique), donc on ne valide pas.
+                    throw new IllegalArgumentException("Colonne inconnue : " + sel);
+                }
+            }
+        }
     }
 
-    // WhereClause — structure de filtre
+    private List<AggSpec> parseAggregations(List<String> select) {
+        List<AggSpec> aggs = new ArrayList<>();
+        if (select == null) return aggs;
+        for (String sel : select) {
+            AggSpec spec = AggSpec.tryParse(sel);
+            if (spec != null) aggs.add(spec);
+        }
+        return aggs;
+    }
+
+    // ---------------------------------------------------------------------
+    // Structures internes
+    // ---------------------------------------------------------------------
+
+    /** Spécification d'une agrégation, ex : "SUM(salaire)". */
+    private static class AggSpec {
+        final String raw;       // "SUM(salaire)"
+        final String func;      // "SUM"
+        final String column;    // "salaire"
+
+        AggSpec(String raw, String func, String column) {
+            this.raw = raw; this.func = func; this.column = column;
+        }
+
+        static AggSpec tryParse(String sel) {
+            if (sel == null) return null;
+            String upper = sel.toUpperCase();
+            for (String agg : List.of("SUM", "AVG", "MIN", "MAX")) {
+                if (upper.startsWith(agg + "(") && upper.endsWith(")")) {
+                    String col = sel.substring(agg.length() + 1, sel.length() - 1).trim();
+                    return new AggSpec(sel, agg, col);
+                }
+            }
+            return null;
+        }
+    }
+
+    /** Accumulateur par groupe : évite de stocker toutes les valeurs. */
+    private static class GroupAcc {
+        long count = 0;
+        final Map<String, double[]> sums = new HashMap<>();  // raw -> [sum]
+        final Map<String, long[]>   nums = new HashMap<>();  // raw -> [nbValeursNumeriques]
+        final Map<String, Double>   mins = new HashMap<>();
+        final Map<String, Double>   maxs = new HashMap<>();
+
+        GroupAcc(List<AggSpec> aggs) {
+            for (AggSpec a : aggs) {
+                sums.put(a.raw, new double[]{0});
+                nums.put(a.raw, new long[]{0});
+            }
+        }
+
+        void update(AggSpec spec, double v) {
+            sums.get(spec.raw)[0] += v;
+            nums.get(spec.raw)[0] += 1;
+            mins.merge(spec.raw, v, Math::min);
+            maxs.merge(spec.raw, v, Math::max);
+        }
+
+        Object result(AggSpec spec) {
+            long n = nums.get(spec.raw)[0];
+            if (n == 0) return null;
+            return switch (spec.func) {
+                case "SUM" -> sums.get(spec.raw)[0];
+                case "AVG" -> sums.get(spec.raw)[0] / n;
+                case "MIN" -> mins.get(spec.raw);
+                case "MAX" -> maxs.get(spec.raw);
+                default    -> null;
+            };
+        }
+    }
+
+    // WhereClause — structure de filtre (inchangée, API publique)
     public static class WhereClause {
         public String column;
         public String operator;

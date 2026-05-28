@@ -10,8 +10,21 @@ import java.nio.file.*;
 public class Table {
     private final String name;
     private final List<Column> columns;
-    private static final int MAX_ROWS_IN_MEMORY = 2_000_000;
+
+    /** Seuil de bascule mémoire -> disque (en nombre de lignes). */
+    public static final int DEFAULT_MAX_ROWS_IN_MEMORY = 2_000_000;
+
+    /**
+     * Rendu non statique + modifiable pour pouvoir l'abaisser dans les tests
+     * (impossible de tester un spill avec 2 millions de lignes en CI).
+     */
+    private int maxRowsInMemory = DEFAULT_MAX_ROWS_IN_MEMORY;
+
+    /** Segments écrits sur le disque (données "froides"). */
     private final List<DiskSegment> diskSegments = new ArrayList<>();
+
+    /** Nombre total de lignes déjà déversées sur disque (somme des segments). */
+    private long diskRowCount = 0;
 
     public Table(String name) {
         this.name = name;
@@ -23,13 +36,21 @@ public class Table {
         this.columns = new ArrayList<>(columns);
     }
 
+    /** Réglage du seuil (utilisé surtout pour les tests). */
+    public void setMaxRowsInMemory(int maxRowsInMemory) {
+        if (maxRowsInMemory < 1) throw new IllegalArgumentException("Seuil >= 1 requis");
+        this.maxRowsInMemory = maxRowsInMemory;
+    }
+
+    public int getMaxRowsInMemory() { return maxRowsInMemory; }
+
     /** Ajoute une colonne vide */
     public boolean addColumn(String name, String type) {
         columns.add(new Column(name, type));
         return true;
     }
 
-    /** Ajoute une valeur dans la colonne nommée */
+    /** Ajoute une valeur dans la colonne nommée (déclenche le spill si besoin) */
     public boolean addToColumn(String columnName, Object value) {
         for (Column c : columns) {
             if (c.getName().equals(columnName)) {
@@ -46,9 +67,15 @@ public class Table {
         return columns.removeIf(c -> c.getName().equals(name));
     }
 
-    public int rowCount() {
+    /** Lignes actuellement détenues en RAM (= taille de la 1re colonne). */
+    public int memoryRowCount() {
         if (columns.isEmpty()) return 0;
         return columns.get(0).size();
+    }
+
+    /** Total logique = lignes en mémoire + lignes sur disque. */
+    public long totalRowCount() {
+        return memoryRowCount() + diskRowCount;
     }
 
     public Column getColumn(String name) {
@@ -58,6 +85,18 @@ public class Table {
         throw new IllegalArgumentException("Colonne inconnue : " + name);
     }
 
+    /** Noms des colonnes dans l'ordre (le schéma survit aux spills). */
+    public List<String> getColumnNames() {
+        List<String> names = new ArrayList<>(columns.size());
+        for (Column c : columns) names.add(c.getName());
+        return names;
+    }
+
+    public boolean hasColumn(String name) {
+        for (Column c : columns) if (c.getName().equals(name)) return true;
+        return false;
+    }
+
     /** Retourne les colonnes (copies défensives) */
     public List<Column> getColumns() {
         List<Column> clones = new ArrayList<>();
@@ -65,31 +104,69 @@ public class Table {
         return clones;
     }
 
-    /** Accès direct aux colonnes internes (pour le QueryEngine) */
+    /** Accès direct aux colonnes internes (pour le QueryEngine / loaders) */
     public List<Column> getColumnsInternal() {
         return columns;
     }
 
-    /** Sérialise toutes les lignes en liste de maps (pour JSON) */
+    public List<DiskSegment> getDiskSegments() { return diskSegments; }
+
+    /**
+     * Ouvre un curseur qui parcourt TOUTES les lignes (RAM puis disque),
+     * une par une, sans charger les segments froids en mémoire.
+     */
+    public RowCursor openCursor() {
+        return new CompositeRowCursor(columns, memoryRowCount(), new ArrayList<>(diskSegments));
+    }
+
+    /**
+     * Sérialise toutes les lignes (RAM + disque) en liste de maps.
+     * ATTENTION : matérialise tout en mémoire — à éviter sur de très grosses
+     * tables. Préférer une requête avec LIMIT pour ces cas.
+     */
     public List<Map<String, Object>> toRows() {
         List<Map<String, Object>> rows = new ArrayList<>();
-        int total = rowCount();
-        for (int i = 0; i < total; i++) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            for (Column c : columns) {
-                row.put(c.getName(), c.get(i));
+        try (RowCursor cursor = openCursor()) {
+            while (cursor.hasNext()) {
+                rows.add(new LinkedHashMap<>(cursor.next().values()));
             }
-            rows.add(row);
         }
         return rows;
     }
 
+    // ----------------------------------------------------------------------
+    // Bascule mémoire -> disque
+    // ----------------------------------------------------------------------
+
+    private void checkSpillToDisk() {
+        // Garde rapide : tant qu'on n'a pas atteint le seuil, rien à faire.
+        if (memoryRowCount() < maxRowsInMemory) return;
+
+        // On ne déverse que sur une frontière de ligne : toutes les colonnes
+        // doivent avoir la même taille (sinon la dernière ligne est incomplète,
+        // car l'insertion se fait colonne par colonne).
+        if (!allColumnsSameSize()) return;
+
+        spillToDisk();
+    }
+
+    private boolean allColumnsSameSize() {
+        if (columns.isEmpty()) return true;
+        int s = columns.get(0).size();
+        for (Column c : columns) if (c.size() != s) return false;
+        return true;
+    }
+
     private void spillToDisk() {
         try {
-            Path tempFile = Files.createTempFile( "sgbd-" + name + "-", ".bin" );
+            Path tempFile = Files.createTempFile("sgbd-" + name + "-", ".bin");
             tempFile.toFile().deleteOnExit();
-            try (ObjectOutputStream out = new ObjectOutputStream( new BufferedOutputStream( Files.newOutputStream(tempFile)))) {
-                int rows = rowCount();
+
+            int rows = memoryRowCount();
+
+            try (ObjectOutputStream out = new ObjectOutputStream(
+                    new BufferedOutputStream(Files.newOutputStream(tempFile)))) {
+
                 out.writeInt(rows);
                 out.writeInt(columns.size());
                 for (Column column : columns) {
@@ -102,21 +179,34 @@ public class Table {
                     }
                 }
             }
-            diskSegments.add( new DiskSegment(tempFile, rowCount()) );
+
+            diskSegments.add(new DiskSegment(tempFile, rows));
+            diskRowCount += rows;
             clearMemoryData();
+
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Echec du spill vers le disque", e);
         }
     }
 
-    private void clearMemoryData() { for (Column column : columns) { column.clear(); } }
+    private void clearMemoryData() {
+        for (Column column : columns) column.clear();
+    }
 
-    public List<DiskSegment> getDiskSegments() { return diskSegments; }
-
-    private void checkSpillToDisk() {
-        if (rowCount() >= MAX_ROWS_IN_MEMORY) {
-            spillToDisk();
+    /**
+     * Supprime immédiatement tous les fichiers de segments de cette table.
+     * Appelé lors d'un DROP TABLE et à l'arrêt du serveur.
+     */
+    public void cleanupDiskSegments() {
+        for (DiskSegment seg : diskSegments) {
+            try {
+                Files.deleteIfExists(seg.getFile());
+            } catch (IOException ignored) {
+                // Si la suppression échoue, deleteOnExit prendra le relais.
+            }
         }
+        diskSegments.clear();
+        diskRowCount = 0;
     }
 
     public String getName() { return name; }

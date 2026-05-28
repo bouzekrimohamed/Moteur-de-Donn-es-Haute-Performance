@@ -118,7 +118,7 @@ class EngineUnitTest {
         @Test
         @DisplayName("rowCount = 0 sur table vide")
         void emptyRowCount() {
-            assertEquals(0, table.rowCount());
+            assertEquals(0, table.totalRowCount());
         }
 
         @Test
@@ -126,7 +126,7 @@ class EngineUnitTest {
         void addToColumnIncrementsRowCount() {
             table.addToColumn("produit", "Laptop");
             table.addToColumn("quantite", 3);
-            assertEquals(1, table.rowCount());
+            assertEquals(1, table.totalRowCount());
         }
 
         @Test
@@ -172,7 +172,7 @@ class EngineUnitTest {
             List<Column> cols = table.getColumns();
             cols.get(0).add("Hack");
             // La table originale ne doit pas être modifiée
-            assertEquals(0, table.rowCount());
+            assertEquals(0, table.totalRowCount());
         }
 
         @Test

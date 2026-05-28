@@ -101,7 +101,7 @@ public class FileLoadResource {
             validateFile(req.filePath, ".parquet");
             Table table = ParquetLoader.loadAsNewTable(req.filePath);
             tableManager.registerTable(table);
-            int count = table.rowCount();
+            long count = table.totalRowCount();
             return Response.status(Response.Status.CREATED)
                     .entity(new FileLoadResponse("CREATED", count, table.getName(), req.filePath))
                     .build();
@@ -140,11 +140,11 @@ public class FileLoadResource {
 
     public static class FileLoadResponse {
         public String status;
-        public int rowsLoaded;
+        public long rowsLoaded;
         public String tableName;
         public String sourceFile;
 
-        public FileLoadResponse(String status, int rowsLoaded, String tableName, String sourceFile) {
+        public FileLoadResponse(String status, long rowsLoaded, String tableName, String sourceFile) {
             this.status = status;
             this.rowsLoaded = rowsLoaded;
             this.tableName = tableName;
