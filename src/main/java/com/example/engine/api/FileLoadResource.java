@@ -10,6 +10,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
+import jakarta.ws.rs.BeanParam;
 
 import java.io.File;
 import java.util.Map;
@@ -127,14 +128,13 @@ public class FileLoadResource {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response uploadParquet(
             @PathParam("tableName") String tableName,
-            @RestForm("file") FileUpload upload) {
+            @BeanParam ParquetUploadForm form) {
         try {
-            validateUploadExtension(upload.fileName(), ".parquet");
-            // FileUpload.uploadedFile() retourne un java.nio.file.Path temporaire
+            validateUploadExtension(form.file.fileName(), ".parquet");
             Table table = tableManager.getInternalTable(tableName);
-            int count = ParquetLoader.load(table, upload.uploadedFile().toString());
+            int count = ParquetLoader.load(table, form.file.uploadedFile().toString());
             return Response.accepted(
-                            new FileLoadResponse("ACCEPTED", count, tableName, upload.fileName()))
+                            new FileLoadResponse("ACCEPTED", count, tableName, form.file.fileName()))
                     .build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -153,14 +153,14 @@ public class FileLoadResource {
     @POST
     @Path("/import/upload/parquet")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    public Response importUploadParquet(@RestForm("file") FileUpload upload) {
+    public Response importUploadParquet(@BeanParam ParquetUploadForm form) {
         try {
-            validateUploadExtension(upload.fileName(), ".parquet");
-            Table table = ParquetLoader.loadAsNewTable(upload.uploadedFile().toString());
+            validateUploadExtension(form.file.fileName(), ".parquet");
+            Table table = ParquetLoader.loadAsNewTable(form.file.uploadedFile().toString());
             tableManager.registerTable(table);
             long count = table.totalRowCount();
             return Response.status(Response.Status.CREATED)
-                    .entity(new FileLoadResponse("CREATED", count, table.getName(), upload.fileName()))
+                    .entity(new FileLoadResponse("CREATED", count, table.getName(), form.file.fileName()))
                     .build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -181,13 +181,13 @@ public class FileLoadResource {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response uploadCsv(
             @PathParam("tableName") String tableName,
-            @RestForm("file") FileUpload upload) {
+            @BeanParam CsvUploadForm form) {
         try {
-            validateUploadExtension(upload.fileName(), ".csv");
+            validateUploadExtension(form.file.fileName(), ".csv");
             Table table = tableManager.getInternalTable(tableName);
-            int count = CsvLoader.load(table, upload.uploadedFile().toString());
+            int count = CsvLoader.load(table, form.file.uploadedFile().toString());
             return Response.accepted(
-                            new FileLoadResponse("ACCEPTED", count, tableName, upload.fileName()))
+                            new FileLoadResponse("ACCEPTED", count, tableName, form.file.fileName()))
                     .build();
         } catch (IllegalArgumentException ex) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -242,4 +242,14 @@ public class FileLoadResource {
             this.sourceFile = sourceFile;
         }
     }
+}
+
+class ParquetUploadForm {
+    @RestForm("file")
+    public FileUpload file;
+}
+
+class CsvUploadForm {
+    @RestForm("file")
+    public FileUpload file;
 }
